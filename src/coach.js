@@ -2,7 +2,7 @@ import { rules } from "./data.js";
 
 const clamp = value => Math.max(55, Math.min(98, Math.round(value)));
 
-export function analyze(text, seconds = 10) {
+export function analyze(text, seconds = 10, speechEvidence = null) {
   const words = text.trim().split(/\s+/).filter(Boolean);
   const fillers = text.match(/\b(um+|uh+|like|you know|basically)\b/gi) || [];
   const corrections = rules.filter(([pattern]) => pattern.test(text)).map(([pattern, replacement, reason]) => ({
@@ -13,10 +13,11 @@ export function analyze(text, seconds = 10) {
     fluency: clamp(82 + Math.min(words.length, 20) * .5 - fillers.length * 8 - Math.abs(110 - wpm) * .06),
     grammar: clamp(94 - corrections.length * 14),
     vocabulary: clamp(72 + new Set(words.map(w => w.toLowerCase())).size * .9),
-    pronunciation: clamp(81 + Math.min(words.length, 20) * .4 - fillers.length * 3)
+    pronunciation: speechEvidence ? clamp(speechEvidence.clarity) : null
   };
-  scores.overall = clamp(Object.values(scores).reduce((a, b) => a + b, 0) / 4);
-  return { words: words.length, fillers: fillers.length, wpm, corrections, scores };
+  const scored = Object.values(scores).filter(Number.isFinite);
+  scores.overall = clamp(scored.reduce((a, b) => a + b, 0) / scored.length);
+  return { words: words.length, fillers: fillers.length, wpm, corrections, scores, speechEvidence };
 }
 
 export function reply(scenario, turn, text) {
@@ -28,7 +29,10 @@ export function reply(scenario, turn, text) {
 
 export function summarize(messages) {
   const analyses = messages.filter(m => m.role === "user").map(m => m.analysis);
-  const avg = key => analyses.length ? Math.round(analyses.reduce((sum, a) => sum + a.scores[key], 0) / analyses.length) : 0;
+  const avg = key => {
+    const values = analyses.map(a => a.scores[key]).filter(Number.isFinite);
+    return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+  };
   return {
     overall: avg("overall"), fluency: avg("fluency"), grammar: avg("grammar"),
     vocabulary: avg("vocabulary"), pronunciation: avg("pronunciation"),
