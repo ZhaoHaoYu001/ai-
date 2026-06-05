@@ -1,8 +1,9 @@
 import { scenarios } from "./data.js";
 import { analyze, reply, summarize } from "./coach.js";
 import { buildGrowthCalendar } from "./progress.js";
+import { recognitionTranscript, translateCoachText } from "./voice.js";
 
-const state = { view: "home", scenario: null, messages: [], elapsed: 0, timer: null, listening: false, recognition: null };
+const state = { view: "home", scenario: null, messages: [], elapsed: 0, timer: null, listening: false, recognition: null, liveVoice: false, interim: "", coachSpeaking: false, coachPaused: false };
 const app = document.querySelector("#app");
 const header = () => `<header><button class="brand" data-home><b>F</b> FluentLoop</button><nav>练习场景　 学习方法　 成长记录</nav><span class="streak">● <b>3</b> 天连续练习</span></header>`;
 
@@ -38,15 +39,19 @@ const card = s => `<article class="scene" data-scene="${s.id}" style="--accent:$
 function practice() {
   const s = state.scenario, last = [...state.messages].reverse().find(m => m.role === "user");
   app.innerHTML = `${header()}<main class="practice"><aside><button class="back" data-home>← 返回场景</button><div class="current" style="--accent:${s.color}"><i>${s.icon}</i><span><small>当前场景</small><b>${s.title}</b><label>${s.en}</label></span></div><div class="goal"><small>本次目标</small><p>${s.goal}</p></div><div class="live"><small>实时表现</small>${mini("流利度",last?.analysis.scores.fluency)}${mini("语法",last?.analysis.scores.grammar)}${mini("词汇",last?.analysis.scores.vocabulary)}${mini("发音",last?.analysis.scores.pronunciation)}</div><button class="finish" data-finish>结束练习并查看报告</button></aside>
-  <section class="conversation"><div class="conv-head"><span>● <b>对话进行中</b><small>AI 会在你说完后提供反馈</small></span><b id="timer">${format(state.elapsed)}</b></div><div class="messages">${state.messages.map(message).join("")}${state.listening ? `<div class="listening">● 正在聆听…</div>` : ""}</div><div class="composer"><small>💡 试着说：${s.prompts[state.messages.filter(m=>m.role==="user").length%s.prompts.length]}</small><div><button data-demo>填入演示回答</button><input placeholder="也可以输入英文回答…"><button data-send>↑</button><button class="mic ${state.listening?"active":""}" data-mic>${state.listening?"■ 停止":"● 按下说话"}</button></div></div></section></main>`;
+  <section class="conversation"><div class="conv-head"><span>● <b>实时语音训练</b><small>${state.liveVoice ? "持续转写已开启，Coach 发言结束后自动恢复监听" : "开启持续转写后，无需反复点击麦克风"}</small></span><div class="voice-status"><button data-voice-toggle>${state.liveVoice ? "■ 关闭持续转写" : "● 开启持续转写"}</button><b id="timer">${format(state.elapsed)}</b></div></div><div class="messages">${state.messages.map(message).join("")}${state.listening ? `<div class="listening"><b>● 正在持续聆听</b><span>${state.interim || "请开始说英语，完整句子将自动发送…"}</span></div>` : ""}</div><div class="composer"><small>💡 试着说：${s.prompts[state.messages.filter(m=>m.role==="user").length%s.prompts.length]}</small><div><button data-demo>填入演示回答</button><input placeholder="也可以输入英文回答…"><button data-send>↑</button><button class="mic ${state.listening?"active":""}" data-mic>${state.listening?"■ 暂停录入":"● 单次录入"}</button></div></div></section></main>`;
   bindHome(); document.querySelector("[data-finish]").onclick=finish;
   document.querySelector("[data-demo]").onclick=()=>document.querySelector("input").value=s.demo;
   document.querySelector("[data-send]").onclick=send; document.querySelector("input").onkeydown=e=>e.key==="Enter"&&send();
   document.querySelector("[data-mic]").onclick=mic; document.querySelectorAll("[data-speak]").forEach(b=>b.onclick=()=>speak(decodeURIComponent(b.dataset.speak)));
+  document.querySelector("[data-voice-toggle]").onclick=toggleLiveVoice;
+  document.querySelectorAll("[data-speech-pause]").forEach(b=>b.onclick=pauseCoach);
+  document.querySelectorAll("[data-speech-resume]").forEach(b=>b.onclick=resumeCoach);
+  document.querySelectorAll("[data-speech-stop]").forEach(b=>b.onclick=stopCoach);
   requestAnimationFrame(()=>{ const el=document.querySelector(".messages"); el.scrollTop=el.scrollHeight; });
 }
 const mini=(name,value=0)=>`<div><span>${name}</span><i><b style="width:${value}%"></b></i><strong>${value||"—"}</strong></div>`;
-const message=m=>m.role==="coach"?`<article class="msg coach"><i>FL</i><div><small>FLUENT COACH</small><p>${m.text}</p><button data-speak="${encodeURIComponent(m.text)}">▶ 播放</button></div></article>`:
+const message=m=>m.role==="coach"?`<article class="msg coach"><i>FL</i><div><small>FLUENT COACH</small><p>${m.text}</p><p class="translation">${m.translation || translateCoachText(m.text,state.scenario?.id)}</p><div class="speech-controls"><button data-speak="${encodeURIComponent(m.text)}">▶ 播放</button><button data-speech-pause>Ⅱ 暂停</button><button data-speech-resume>▷ 继续</button><button data-speech-stop>■ 停止</button></div></div></article>`:
 `<article class="msg user"><div><small>YOU</small><p>${m.text}</p><section class="feedback"><strong>${m.analysis.scores.overall}</strong><span><b>${m.analysis.corrections.length?"表达清晰，留意下面的小调整。":"表达自然且清晰，句型使用得很好。"}</b><small>${m.analysis.wpm} WPM · ${m.analysis.words} words</small></span>${m.analysis.corrections.map(c=>`<article><label>表达建议</label><del>${c.original}</del><b>→ ${c.improved}</b><small>${c.reason}</small></article>`).join("")||"<em>✓ 本轮没有发现明显语法问题</em>"}</section></div><i>YOU</i></article>`;
 
 function report() {
@@ -56,12 +61,19 @@ function report() {
 }
 const metric=(name,score)=>`<article><span><small>${name}</small><b>${score||"--"}</b></span><i><b style="width:${score}%"></b></i><p>保持练习，下一次表达会更自然。</p></article>`;
 
-function start(id){ state.scenario=scenarios.find(s=>s.id===id); state.messages=[{role:"coach",text:state.scenario.opening}]; state.view="practice"; state.elapsed=0; clearInterval(state.timer); state.timer=setInterval(()=>{state.elapsed++; const t=document.querySelector("#timer");if(t)t.textContent=format(state.elapsed)},1000); practice(); setTimeout(()=>speak(state.scenario.opening),300); }
+function start(id){ state.scenario=scenarios.find(s=>s.id===id); state.messages=[{role:"coach",text:state.scenario.opening,translation:translateCoachText(state.scenario.opening,id)}]; state.view="practice"; state.liveVoice=true; state.interim=""; state.elapsed=0; clearInterval(state.timer); state.timer=setInterval(()=>{state.elapsed++; const t=document.querySelector("#timer");if(t)t.textContent=format(state.elapsed)},1000); practice(); setTimeout(()=>speak(state.scenario.opening),300); }
 function send(){const input=document.querySelector("input"),text=input.value.trim();if(!text)return; const analysis=analyze(text,Math.max(7,text.split(/\s+/).length/1.8));state.messages.push({role:"user",text,analysis});practice();setTimeout(()=>{const turns=state.messages.filter(m=>m.role==="user").length;const text=reply(state.scenario,turns-1,state.messages.at(-1).text);state.messages.push({role:"coach",text});practice();speak(text)},500)}
-function mic(){if(state.listening){state.recognition?.stop();return} const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert("请使用 Chrome 或 Edge 体验语音识别，也可使用文字输入。");return}const rec=new SR();rec.lang="en-US";rec.interimResults=false;state.recognition=rec;state.listening=true;practice();rec.onresult=e=>{state.listening=false;const text=e.results[0][0].transcript;const analysis=analyze(text);state.messages.push({role:"user",text,analysis});practice();setTimeout(()=>{const answer=reply(state.scenario,state.messages.filter(m=>m.role==="user").length-1,text);state.messages.push({role:"coach",text:answer});practice();speak(answer)},500)};rec.onend=()=>{state.listening=false;practice()};rec.start()}
-function speak(text){if(!speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=.94;speechSynthesis.speak(u)}
-function finish(){clearInterval(state.timer);const r=summarize(state.messages),h=JSON.parse(localStorage.getItem("fluentloop-history")||"[]");h.unshift({...r,scenario:state.scenario.title,date:new Date().toISOString()});localStorage.setItem("fluentloop-history",JSON.stringify(h.slice(0,180)));state.view="report";report()}
-function bindHome(){document.querySelectorAll("[data-home]").forEach(el=>el.onclick=()=>{clearInterval(state.timer);state.view="home";home()})}
+function mic(){if(state.listening){state.liveVoice=false;state.recognition?.stop();return}startRecognition(false)}
+function toggleLiveVoice(){state.liveVoice=!state.liveVoice;if(state.liveVoice)startRecognition(true);else{state.recognition?.stop();state.listening=false;state.interim="";practice()}}
+function startRecognition(continuous=state.liveVoice){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){state.liveVoice=false;alert("请使用 Chrome 或 Edge 体验持续语音转写，也可使用文字输入。");return}if(state.coachSpeaking)return;const rec=new SR();rec.lang="en-US";rec.interimResults=true;rec.continuous=continuous;state.recognition=rec;state.listening=true;practice();rec.onresult=e=>{const transcript=recognitionTranscript(Array.from(e.results).slice(e.resultIndex));state.interim=transcript.interimText;practice();if(transcript.finalText)addVoiceMessage(transcript.finalText)};rec.onerror=()=>{state.listening=false;state.interim="";practice()};rec.onend=()=>{state.listening=false;state.interim="";practice();if(state.liveVoice&&!state.coachSpeaking)setTimeout(()=>startRecognition(true),350)};rec.start()}
+function addVoiceMessage(text){const analysis=analyze(text);state.messages.push({role:"user",text,analysis});state.interim="";practice();setTimeout(()=>{const answer=reply(state.scenario,state.messages.filter(m=>m.role==="user").length-1,text);state.messages.push({role:"coach",text:answer,translation:translateCoachText(answer,state.scenario.id)});practice();speak(answer)},500)}
+function speak(text){if(!speechSynthesis)return;state.coachSpeaking=true;state.coachPaused=false;if(state.listening)state.recognition?.stop();speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=.94;u.onend=u.onerror=()=>{state.coachSpeaking=false;state.coachPaused=false;if(state.liveVoice)setTimeout(()=>startRecognition(true),250)};speechSynthesis.speak(u);practice()}
+function pauseCoach(){if(!speechSynthesis?.speaking)return;speechSynthesis.pause();state.coachPaused=true;practice()}
+function resumeCoach(){if(!speechSynthesis?.paused)return;speechSynthesis.resume();state.coachPaused=false;practice()}
+function stopCoach(){speechSynthesis?.cancel();state.coachSpeaking=false;state.coachPaused=false;if(state.liveVoice)setTimeout(()=>startRecognition(true),250);practice()}
+function finish(){stopVoiceSession();clearInterval(state.timer);const r=summarize(state.messages),h=JSON.parse(localStorage.getItem("fluentloop-history")||"[]");h.unshift({...r,scenario:state.scenario.title,date:new Date().toISOString()});localStorage.setItem("fluentloop-history",JSON.stringify(h.slice(0,180)));state.view="report";report()}
+function stopVoiceSession(){state.liveVoice=false;state.listening=false;state.coachSpeaking=false;state.coachPaused=false;state.interim="";state.recognition?.stop();speechSynthesis?.cancel()}
+function bindHome(){document.querySelectorAll("[data-home]").forEach(el=>el.onclick=()=>{stopVoiceSession();clearInterval(state.timer);state.view="home";home()})}
 const format=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
 const pageFooter=()=>`<footer class="page-footer"><span class="brand"><b>F</b> FluentLoop</span><p>Practice boldly. Speak naturally.</p><small>Built for AI speaking practice · 2026</small></footer>`;
 home();
