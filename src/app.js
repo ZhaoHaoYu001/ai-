@@ -1,5 +1,6 @@
 import { scenarios } from "./data.js";
 import { analyze, reply, summarize } from "./coach.js";
+import { buildGrowthCalendar } from "./progress.js";
 
 const state = { view: "home", scenario: null, messages: [], elapsed: 0, timer: null, listening: false, recognition: null };
 const app = document.querySelector("#app");
@@ -12,11 +13,24 @@ function home() {
     <div class="visual"><div class="orb"></div><article class="coach-card"><div class="coach-title"><i>FL</i><span><b>Fluent Coach</b><small>● Ready to practice</small></span></div><h2>“Tell me about a challenge you solved at work.”</h2><div class="wave">${"<i></i>".repeat(24)}</div><footer><span><b>86</b> Fluency</span><span><b>92</b> Grammar</span><span><b>84</b> Pronunciation</span></footer></article></div></section>
     <section class="scenes" id="scenes"><div class="section-title"><span><label>CHOOSE A SCENE</label><h2>今天想练什么？</h2></span><p>每个场景都由 AI 扮演真实角色，并根据你的水平动态追问。</p></div><div class="scene-grid">${scenarios.map(card).join("")}</div></section>
     <section class="loop"><div><label>LEARNING LOOP</label><h2>不只告诉你哪里错，<br>更告诉你如何变好。</h2></div><div class="steps"><article><b>01</b><h3>自然对话</h3><p>AI 根据上下文追问，避免背答案式练习。</p></article><article><b>02</b><h3>适时反馈</h3><p>不中断表达，回答结束后再给精准建议。</p></article><article><b>03</b><h3>量化成长</h3><p>持续追踪流利度、语法、词汇和发音。</p></article></div></section>
+    ${growthCalendar(history)}
     ${history.length ? `<section class="history"><label>YOUR PROGRESS</label><h2>持续练习，变化看得见</h2><article><span><small>最近一次</small><b>${history[0].scenario}</b></span><strong>${history[0].overall}<small>综合得分</small></strong><span><b>↗ 保持练习</b><small>下一次会更自然</small></span></article></section>` : ""}
     </main>${pageFooter()}`;
   document.querySelector("[data-start]").onclick = () => document.querySelector("#scenes").scrollIntoView({behavior:"smooth"});
   document.querySelectorAll("[data-scene]").forEach(el => el.onclick = () => start(el.dataset.scene));
   bindHome();
+}
+
+function growthCalendar(history) {
+  const calendar = buildGrowthCalendar(history);
+  const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+  return `<section class="growth-calendar">
+    <div class="calendar-heading"><div><label>DAILY GROWTH</label><h2>练习日历</h2><p>完成一次口语练习，即可点亮当天成长记录。</p></div>
+    <div class="calendar-stats"><span><b>${calendar.streak}</b>连续天数</span><span><b>${calendar.activeDays}</b>本月签到</span><span><b>${calendar.totalWords}</b>累计单词</span></div></div>
+    <article class="calendar-card"><header><b>${calendar.label}</b><small>${calendar.activeDays ? "坚持正在发生，继续保持。" : "完成今天的第一场练习吧。"}</small></header>
+    <div class="weekdays">${weekdays.map(day => `<span>${day}</span>`).join("")}</div>
+    <div class="calendar-grid">${calendar.cells.map(cell => cell ? `<div class="calendar-day ${cell.activity ? "checked" : ""} ${cell.isToday ? "today" : ""}" title="${cell.activity ? `${cell.activity.sessions} 次练习 · 最高 ${cell.activity.bestScore} 分` : "尚未练习"}"><span>${cell.day}</span>${cell.activity ? `<i>✓</i><small>${cell.activity.bestScore}</small>` : ""}</div>` : "<div></div>").join("")}</div></article>
+  </section>`;
 }
 
 const card = s => `<article class="scene" data-scene="${s.id}" style="--accent:${s.color}"><div><i>${s.icon}</i><small>${s.level}</small></div><h3>${s.title}</h3><label>${s.en}</label><p>${s.description}</p><footer><span>◷ ${s.time}</span><b>开始 →</b></footer></article>`;
@@ -46,7 +60,7 @@ function start(id){ state.scenario=scenarios.find(s=>s.id===id); state.messages=
 function send(){const input=document.querySelector("input"),text=input.value.trim();if(!text)return; const analysis=analyze(text,Math.max(7,text.split(/\s+/).length/1.8));state.messages.push({role:"user",text,analysis});practice();setTimeout(()=>{const turns=state.messages.filter(m=>m.role==="user").length;const text=reply(state.scenario,turns-1,state.messages.at(-1).text);state.messages.push({role:"coach",text});practice();speak(text)},500)}
 function mic(){if(state.listening){state.recognition?.stop();return} const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert("请使用 Chrome 或 Edge 体验语音识别，也可使用文字输入。");return}const rec=new SR();rec.lang="en-US";rec.interimResults=false;state.recognition=rec;state.listening=true;practice();rec.onresult=e=>{state.listening=false;const text=e.results[0][0].transcript;const analysis=analyze(text);state.messages.push({role:"user",text,analysis});practice();setTimeout(()=>{const answer=reply(state.scenario,state.messages.filter(m=>m.role==="user").length-1,text);state.messages.push({role:"coach",text:answer});practice();speak(answer)},500)};rec.onend=()=>{state.listening=false;practice()};rec.start()}
 function speak(text){if(!speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=.94;speechSynthesis.speak(u)}
-function finish(){clearInterval(state.timer);const r=summarize(state.messages),h=JSON.parse(localStorage.getItem("fluentloop-history")||"[]");h.unshift({...r,scenario:state.scenario.title,date:new Date().toISOString()});localStorage.setItem("fluentloop-history",JSON.stringify(h.slice(0,10)));state.view="report";report()}
+function finish(){clearInterval(state.timer);const r=summarize(state.messages),h=JSON.parse(localStorage.getItem("fluentloop-history")||"[]");h.unshift({...r,scenario:state.scenario.title,date:new Date().toISOString()});localStorage.setItem("fluentloop-history",JSON.stringify(h.slice(0,180)));state.view="report";report()}
 function bindHome(){document.querySelectorAll("[data-home]").forEach(el=>el.onclick=()=>{clearInterval(state.timer);state.view="home";home()})}
 const format=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
 const pageFooter=()=>`<footer class="page-footer"><span class="brand"><b>F</b> FluentLoop</span><p>Practice boldly. Speak naturally.</p><small>Built for AI speaking practice · 2026</small></footer>`;
