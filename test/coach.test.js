@@ -15,6 +15,14 @@ test("returns strong scores for a clear natural response", () => {
   assert.equal(result.corrections.length, 0);
   assert.ok(result.scores.overall >= 80);
   assert.ok(result.wpm > 80);
+  assert.equal(result.scores.pronunciation, null);
+});
+
+test("uses real speech evidence when calculating clarity score", () => {
+  const evidence = { clarity: 73, level: "clarity-proxy" };
+  const result = analyze("I enjoy solving customer problems.", 6, evidence);
+  assert.equal(result.scores.pronunciation, 73);
+  assert.equal(result.speechEvidence, evidence);
 });
 
 test("coach follows up based on the selected scenario", () => {
@@ -29,5 +37,5 @@ test("session summary aggregates measurable learning metrics", () => {
   assert.equal(summary.turns, 1);
   assert.equal(summary.words, analysis.words);
   assert.equal(summary.overall, analysis.scores.overall);
+  assert.equal(summary.pronunciation, null);
 });
-
