@@ -1,5 +1,7 @@
 # FluentLoop - AI 英语口语陪练
 
+[![Quality checks](https://github.com/ZhaoHaoYu001/ai-/actions/workflows/check.yml/badge.svg)](https://github.com/ZhaoHaoYu001/ai-/actions/workflows/check.yml)
+
 FluentLoop 是一款面向真实交流场景的英语口语练习工具。它通过场景化角色扮演、浏览器实时语音、回答后智能纠错和可量化课后报告，帮助用户从“知道怎么说”走向“能够自然说出来”。
 
 > Demo 视频：待录制后将可访问链接更新在此处。
@@ -36,6 +38,7 @@ npm.cmd start
 - **可信语音评估**：文字输入不生成发音分；语音输入展示明确标记的浏览器清晰度代理，支持接入专业音素级评测。
 - **录音回放**：训练结束后可回听本次原始录音，复盘停顿、语速和表达清晰度。
 - **课后总结**：展示综合得分、对话轮数、单词数、语速和纠错数量，并给出下一步建议。
+- **个性化学习洞察**：识别本次优势、重点能力、高频错误、历史趋势和下一次复练目标。
 - **成长记录**：在浏览器本地保存最近练习结果，形成持续学习反馈。
 - **文字降级方案**：无法使用麦克风时仍能完整体验全部产品流程。
 
@@ -87,23 +90,28 @@ flowchart LR
 ```text
 .
 ├── index.html            # 应用入口
-├── server.js             # 零依赖本地静态服务
+├── server.js             # 静态服务与受保护的 AI Coach 接口
+├── ai-service.js         # OpenAI Responses API 服务端适配器
 ├── src/
 │   ├── app.js            # 页面状态与交互流程
+│   ├── ai-coach.js       # 浏览器 AI 客户端与离线降级
 │   ├── coach.js          # 对话、纠错与评分引擎
 │   ├── data.js           # 场景和规则数据
+│   ├── progress.js       # 成长日历聚合
+│   ├── speech-assessment.js # 发音评测证据与适配器
+│   ├── voice.js          # 实时转写、翻译与录音采集
 │   └── styles.css        # 响应式视觉系统
-├── test/
-│   └── coach.test.js     # 核心逻辑自动测试
+├── test/                 # 单元与服务集成测试
 └── docs/
     ├── ARCHITECTURE.md
-    └── DEMO_SCRIPT.md
+    ├── DEMO_SCRIPT.md
+    └── SUBMISSION_CHECKLIST.md
 ```
 
 ## 测试
 
 ```bash
-npm test
+npm run check
 ```
 
 手动验收建议：
@@ -114,6 +122,29 @@ npm test
 4. 验证 AI Coach 语音播放、实时评分、表达建议。
 5. 结束练习，检查课后报告与首页成长记录。
 
+## 评审快速复现
+
+1. 运行 `npm start`，打开 `http://127.0.0.1:4173`。
+2. 选择“求职面试”，点击“填入演示回答”并发送，验证离线纠错和评分。
+3. 在 Chrome / Edge 允许麦克风，验证持续转写、语音播放控制和清晰度代理。
+4. 可选配置 `OPENAI_API_KEY`，验证上下文追问和语境化反馈。
+5. 结束练习，验证录音回放、个性化课后洞察和成长日历。
+
+完整提交检查表见 [`docs/SUBMISSION_CHECKLIST.md`](docs/SUBMISSION_CHECKLIST.md)。
+
+## 持续交付记录
+
+核心能力均通过单一职责 PR 交付，并在合并前通过 GitHub Actions：
+
+- [PR #9](https://github.com/ZhaoHaoYu001/ai-/pull/9)：质量门禁与 PR 模板
+- [PR #10](https://github.com/ZhaoHaoYu001/ai-/pull/10)：实时语音控制
+- [PR #11](https://github.com/ZhaoHaoYu001/ai-/pull/11)：可信语音评测
+- [PR #12](https://github.com/ZhaoHaoYu001/ai-/pull/12)：上下文 AI Coach
+- [PR #13](https://github.com/ZhaoHaoYu001/ai-/pull/13)：服务端安全边界
+- [PR #14](https://github.com/ZhaoHaoYu001/ai-/pull/14)：可解释评分
+- [PR #15](https://github.com/ZhaoHaoYu001/ai-/pull/15)：个性化课后报告
+- [PR #16](https://github.com/ZhaoHaoYu001/ai-/pull/16)：对话状态韧性
+
 ## 第三方依赖与原创说明
 
 - 运行时无第三方 JavaScript 库或框架。
@@ -123,9 +154,9 @@ npm test
 - 页面设计、场景数据、对话逻辑、评分逻辑、纠错规则、报告系统及全部代码均为本项目原创实现。
 - 浏览器语音识别的可用性取决于浏览器和网络环境。
 
-## 后续规划
+## 当前边界与后续规划
 
-- 接入实时大模型，实现更开放的角色对话与语境化纠错。
-- 接入音素级发音评测，展示具体单词发音问题。
-- 增加复述任务、错题复练和个性化学习计划。
+- 当前 AI Coach 是请求响应式接口，后续可升级为 WebRTC / WebSocket 流式语音链路。
+- 默认发音结果是明确标记的浏览器清晰度代理，后续接入真实音素级服务。
+- 增加可交互的错题复练与掌握状态跟踪。
 - 增加教师端能力报告与分享链接。
