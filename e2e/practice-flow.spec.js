@@ -54,7 +54,7 @@ test("completes the full text fallback practice flow", async ({ page }) => {
   await mockBrowserVoice(page);
   await page.goto("/");
   await page.getByText("求职面试", { exact: true }).click();
-  await page.getByRole("button", { name: "填入演示回答" }).click();
+  await page.getByRole("button", { name: "填入纠错示例" }).click();
   await page.getByRole("button", { name: "↑" }).click();
   await expect(page.locator(".msg.user>div>p")).toContainText("I have three years experience");
   await expect(page.getByText("OFFLINE FALLBACK", { exact: true })).toBeVisible();
@@ -78,6 +78,12 @@ test("keeps speech across recognition reconnects and sends one explicit turn", a
   await page.goto("/");
   await page.getByText("求职面试", { exact: true }).click();
   await page.getByRole("button", { name: "● 开始语音回答" }).click();
+  const support = page.locator(".answer-support");
+  await expect(support.getByText("回答支架 · 录音时也可参考", { exact: true })).toBeVisible();
+  await expect(support).toContainText("Could you start by telling me a little about yourself?");
+  await expect(support).toContainText("I have experience in...");
+  await expect(support).toContainText("I have three years of experience in product design");
+  await expect(page.getByRole("button", { name: "填入纠错示例" })).toBeDisabled();
   await page.evaluate(() => window.__emitFinalSpeech("I led the launch"));
   await page.evaluate(() => window.__endRecognition());
   await expect(page.getByRole("button", { name: "■ 结束回答并发送" })).toBeVisible();
@@ -98,5 +104,6 @@ test("keeps the core practice workflow usable on a mobile viewport", async ({ pa
   await page.getByText("工作会议", { exact: true }).click();
   await expect(page.locator(".practice aside")).toBeHidden();
   await expect(page.locator(".conversation")).toBeVisible();
+  await expect(page.getByText("回答支架 · 录音时也可参考", { exact: true })).toBeVisible();
   await expect(page.getByPlaceholder("也可以输入英文回答…")).toBeVisible();
 });

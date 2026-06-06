@@ -5,6 +5,11 @@ export const scenarios = [
     color: "#f36b4a", goal: "用 STAR 结构介绍经历，并清晰表达个人优势",
     opening: "Hi! Thanks for joining us today. Could you start by telling me a little about yourself?",
     prompts: ["What achievement are you most proud of?", "Tell me about a challenge you faced and how you handled it.", "Why are you interested in this role?"],
+    support: {
+      starters: ["I have experience in...", "One achievement I am proud of is...", "I was responsible for..."],
+      keywords: ["experience", "responsible for", "result", "learned"],
+      example: "I have three years of experience in product design, and I enjoy turning complex problems into simple experiences."
+    },
     demo: "I have three years experience in product design. I very like turning complex problems into simple experiences."
   },
   {
@@ -13,6 +18,11 @@ export const scenarios = [
     color: "#4aa489", goal: "完成订位确认、点餐、提出需求和结账",
     opening: "Good evening! Welcome to Olive Kitchen. Do you have a reservation with us?",
     prompts: ["Would you like to hear today's specials?", "How would you like your steak cooked?", "Can I get you anything else?"],
+    support: {
+      starters: ["I have a reservation under...", "Could I have...?", "Would it be possible to...?"],
+      keywords: ["reservation", "table", "recommend", "bill"],
+      example: "I have a reservation under Zhao. Could I have a table near the window, please?"
+    },
     demo: "Yes, I have a reservation under Zhao. Could I also have a table near the window?"
   },
   {
@@ -21,6 +31,11 @@ export const scenarios = [
     color: "#6279dc", goal: "结构化汇报进度，并自然表达赞同或不同意见",
     opening: "Morning, everyone. Let's start with a quick progress update. How is your part of the project going?",
     prompts: ["What is the biggest risk we should watch?", "Do you agree with the proposed timeline?", "What support do you need from the team?"],
+    support: {
+      starters: ["I have completed...", "The main risk is...", "I need support with..."],
+      keywords: ["progress", "timeline", "risk", "next step"],
+      example: "I have completed the user research. The next step is to confirm the launch timeline with the team."
+    },
     demo: "My part is almost complete. I finished the user research, but we should discuss about the launch timeline."
   },
   {
@@ -29,6 +44,11 @@ export const scenarios = [
     color: "#dca43d", goal: "准确询问路线、交通方式与所需时间",
     opening: "Hi there! You look a little lost. Is there somewhere you're trying to get to?",
     prompts: ["Would you rather take the subway or walk?", "Do you need help buying a ticket?", "Is there anything else you'd like to visit nearby?"],
+    support: {
+      starters: ["Excuse me, how can I get to...?", "How long does it take...?", "Should I take...?"],
+      keywords: ["subway", "walking distance", "transfer", "ticket"],
+      example: "Excuse me, how can I get to the city museum? Is it faster to walk or take the subway?"
+    },
     demo: "Excuse me, how can I get to the city museum? Is walking more better than taking the subway?"
   }
 ];
