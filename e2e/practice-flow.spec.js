@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-async function mockBrowserVoice(page) {
-  await page.addInitScript(() => {
+async function mockBrowserVoice(page, microphone = "denied") {
+  await page.addInitScript(mode => {
     Object.defineProperty(window, "speechSynthesis", {
       configurable: true,
       value: {
@@ -23,11 +23,12 @@ async function mockBrowserVoice(page) {
       configurable: true,
       value: {
         async getUserMedia() {
+          if (mode === "pending") return new Promise(() => {});
           throw new DOMException("Permission denied", "NotAllowedError");
         }
       }
     });
-  });
+  }, microphone);
 }
 
 async function mockTurnRecognition(page) {
@@ -73,11 +74,12 @@ test("falls back cleanly when microphone permission is denied", async ({ page })
 });
 
 test("keeps speech across recognition reconnects and sends one explicit turn", async ({ page }) => {
-  await mockBrowserVoice(page);
+  await mockBrowserVoice(page, "pending");
   await mockTurnRecognition(page);
   await page.goto("/");
   await page.getByText("求职面试", { exact: true }).click();
   await page.getByRole("button", { name: "● 开始语音回答" }).click();
+  await expect(page.getByText("正在连接麦克风；文字转写已先行启动", { exact: true })).toBeVisible();
   const support = page.locator(".answer-support");
   await expect(support.getByText("回答支架 · 录音时也可参考", { exact: true })).toBeVisible();
   await expect(support).toContainText("Could you start by telling me a little about yourself?");

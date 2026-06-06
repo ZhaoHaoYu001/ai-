@@ -93,11 +93,41 @@ export function encodePcmWav(chunks, inputSampleRate, outputSampleRate = 16000) 
   return new Blob([buffer], { type: "audio/wav" });
 }
 
-export async function createAudioCapture() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+export function requestMicrophoneStream({
+  mediaDevices = navigator.mediaDevices,
+  timeoutMs = 8000
+} = {}) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      settled = true;
+      reject(new Error("Microphone permission request timed out"));
+    }, timeoutMs);
+    mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    }).then(stream => {
+      if (settled) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      resolve(stream);
+    }, error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
+export async function createAudioCapture({ timeoutMs = 8000 } = {}) {
+  const stream = await requestMicrophoneStream({
+    timeoutMs
   });
   const context = new AudioContext();
+  if (context.state === "suspended") await context.resume().catch(() => {});
   const analyser = context.createAnalyser();
   analyser.fftSize = 512;
   const source = context.createMediaStreamSource(stream);
