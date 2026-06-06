@@ -2,16 +2,20 @@ import { analyze, applyAiFeedback, reply } from "./coach.js";
 
 export function createAiCoachClient({
   endpoint = "/api/coach",
-  request = globalThis.fetch
+  request = globalThis.fetch,
+  timeoutMs = 12_000
 } = {}) {
   return {
     async respond({ scenario, messages, text, seconds, speechEvidence }) {
       const localAnalysis = analyze(text, seconds, speechEvidence);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
         const response = await request(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             scenario: {
               id: scenario.id,
@@ -44,6 +48,8 @@ export function createAiCoachClient({
           analysis: localAnalysis,
           coach: { text: reply(scenario, turn, text) }
         };
+      } finally {
+        clearTimeout(timeout);
       }
     }
   };

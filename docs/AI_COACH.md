@@ -41,3 +41,5 @@ evidence.
 - Audio is not sent to the AI Coach endpoint.
 - Only transcript text and recent conversation context are sent.
 - Failed model calls automatically fall back to the local deterministic coach.
+- Browser requests time out after 12 seconds and fall back instead of blocking the session.
+- Consecutive learner answers are queued, and late replies from a finished session are ignored.
