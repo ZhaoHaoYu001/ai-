@@ -6,11 +6,13 @@ FluentLoop uses an explicit, half-duplex learner-turn pattern instead of an
 always-on microphone:
 
 1. The learner clicks **Start voice answer**.
-2. SpeechRecognition and microphone audio are collected for the current turn.
+2. Browser SpeechRecognition and microphone audio are collected for the current turn.
 3. Pauses and browser recognition restarts do not submit partial answers.
 4. Final and interim transcript segments remain visible and are accumulated.
 5. The learner clicks **Finish answer and send** once the answer is complete.
-6. One transcript, one learner-audio segment, and one assessment request are
+6. If browser recognition returned no text, the recorded WAV turn is sent to
+   the protected server transcription endpoint.
+7. One transcript, one learner-audio segment, and one assessment request are
    submitted to the AI Coach.
 
 This interaction is similar to push-to-talk and voice-assistant turn taking. It
@@ -47,6 +49,12 @@ transport event:
 This avoids the old start/stop UI loop and prevents one spoken answer from
 becoming several short AI messages.
 
+When supported by the browser, FluentLoop prepares the `en-US` on-device
+recognition language pack and sets `processLocally`. This avoids depending on
+the browser vendor's remote recognition service. If browser recognition still
+returns no text, the server automatically falls back to Azure Speech-to-Text
+using the same 16 kHz WAV segment used for pronunciation assessment.
+
 References:
 
 - [Web Speech API specification](https://webaudio.github.io/web-speech-api/)
@@ -73,6 +81,10 @@ When microphone audio capture is unavailable but browser speech recognition
 still works, FluentLoop keeps the transcript flow usable and clearly explains
 that pronunciation evidence is unavailable. Text input remains the final
 fallback.
+
+Configure the mature server fallback with `AZURE_SPEECH_KEY` and
+`AZURE_SPEECH_REGION`. Secrets remain on the server; learner audio is uploaded
+only after the learner explicitly finishes a voice answer.
 
 ## Verification
 

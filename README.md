@@ -41,6 +41,10 @@ $env:AZURE_SPEECH_REGION="eastus"
 npm.cmd start
 ```
 
+同一组 Azure Speech 配置也会启用服务端语音转写兜底。当浏览器自带
+`SpeechRecognition` 没有返回文字时，项目会在用户结束回答后上传本轮
+16 kHz WAV 录音并自动完成转写。
+
 详细接口、隐私与降级策略见 `docs/AI_COACH.md` 和 `docs/AZURE_PRONUNCIATION.md`。
 
 打开 `http://localhost:4173`。推荐使用最新版 Chrome 或 Edge，以体验实时英语语音识别和语音合成。

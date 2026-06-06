@@ -42,12 +42,37 @@ async function mockTurnRecognition(page) {
       });
     };
     window.__endRecognition = () => window.__speechInstances.at(-1).onend?.();
+    window.__emitSpeechError = error => window.__speechInstances.at(-1).onerror?.({ error });
     class MockSpeechRecognition {
       constructor() { window.__speechInstances.push(this); }
       start() {}
       stop() { this.onend?.(); }
     }
     Object.defineProperty(window, "SpeechRecognition", { configurable: true, value: MockSpeechRecognition });
+  });
+}
+
+async function mockServerTranscriptionFallback(page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "SpeechRecognition", { configurable: true, value: undefined });
+    Object.defineProperty(window, "webkitSpeechRecognition", { configurable: true, value: undefined });
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: { speaking: false, paused: false, cancel() {}, speak(utterance) { setTimeout(() => utterance.onend?.(), 0); } }
+    });
+    Object.defineProperty(window, "SpeechSynthesisUtterance", {
+      configurable: true,
+      value: class { constructor(text) { this.text = text; } }
+    });
+    window.FLUENTLOOP_AUDIO_CAPTURE_FACTORY = async () => ({
+      beginUtterance() {},
+      snapshot: () => ({ averageLevel: .1, peakLevel: .2, activeRatio: .8 }),
+      utteranceBlob: () => new Blob(["RIFFdemo"], { type: "audio/wav" }),
+      stop: async () => new Blob(["session"], { type: "audio/webm" })
+    });
+    window.FLUENTLOOP_TRANSCRIPTION_SERVICE = {
+      request: async () => ({ ok: true, status: 200, json: async () => ({ text: "I led the launch", confidence: .91 }) })
+    };
   });
 }
 
@@ -97,6 +122,28 @@ test("keeps speech across recognition reconnects and sends one explicit turn", a
   await expect(page.locator(".msg.user>div>p")).toContainText("I led the launch and increased adoption");
   await expect(page.locator(".msg.user")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "● 开始语音回答" })).toBeVisible();
+});
+
+test("uses the recorded turn when browser recognition returns no text", async ({ page }) => {
+  await mockServerTranscriptionFallback(page);
+  await page.goto("/");
+  await page.getByText("求职面试", { exact: true }).click();
+  await page.getByRole("button", { name: "● 开始语音回答" }).click();
+  await expect(page.getByText("麦克风录音已就绪，可生成发音评测", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "■ 结束回答并发送" }).click();
+  await expect(page.locator(".msg.user>div>p")).toContainText("I led the launch");
+});
+
+test("keeps recording after the browser recognition service fails", async ({ page }) => {
+  await mockServerTranscriptionFallback(page);
+  await mockTurnRecognition(page);
+  await page.goto("/");
+  await page.getByText("求职面试", { exact: true }).click();
+  await page.getByRole("button", { name: "● 开始语音回答" }).click();
+  await page.evaluate(() => window.__emitSpeechError("service-not-allowed"));
+  await expect(page.getByRole("button", { name: "■ 结束回答并发送" })).toBeVisible();
+  await page.getByRole("button", { name: "■ 结束回答并发送" }).click();
+  await expect(page.locator(".msg.user>div>p")).toContainText("I led the launch");
 });
 
 test("keeps the core practice workflow usable on a mobile viewport", async ({ page }) => {

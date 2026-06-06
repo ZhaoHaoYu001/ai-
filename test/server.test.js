@@ -28,7 +28,7 @@ test("exposes a health endpoint for startup diagnosis", async () => {
   await withServer(async baseUrl => {
     const response = await fetch(`${baseUrl}/health`);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { status: "ok", app: "FluentLoop", ai: false, aiProvider: null, aiModel: null, pronunciation: false });
+    assert.deepEqual(await response.json(), { status: "ok", app: "FluentLoop", ai: false, aiProvider: null, aiModel: null, pronunciation: false, transcription: false });
   });
 });
 
@@ -143,6 +143,31 @@ test("serves Azure pronunciation results through the protected endpoint", async 
     });
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { provider: "azure-speech", overall: 88, audioBytes: 8, text: "hello" });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("serves recorded speech transcription through the protected endpoint", async () => {
+  const transcriptionService = {
+    available: true,
+    async transcribe(audio) {
+      return { provider: "azure-speech", text: "I led the launch.", audioBytes: audio.length };
+    }
+  };
+  const server = createAppServer(process.cwd(), { transcriptionService });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address();
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/transcribe`, {
+      method: "POST",
+      headers: { "Content-Type": "audio/wav" },
+      body: Buffer.from("RIFFdemo")
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { provider: "azure-speech", text: "I led the launch.", audioBytes: 8 });
   } finally {
     server.close();
     await once(server, "close");
