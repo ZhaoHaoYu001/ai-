@@ -27,6 +27,24 @@ export function reply(scenario, turn, text) {
   return `${bridge} ${scenario.prompts[turn % scenario.prompts.length]}`;
 }
 
+export function applyAiFeedback(analysis, feedback = {}) {
+  const scores = {
+    ...analysis.scores,
+    grammar: Number.isFinite(feedback.grammarScore) ? clamp(feedback.grammarScore) : analysis.scores.grammar,
+    vocabulary: Number.isFinite(feedback.vocabularyScore) ? clamp(feedback.vocabularyScore) : analysis.scores.vocabulary
+  };
+  const scored = [scores.fluency, scores.grammar, scores.vocabulary, scores.pronunciation].filter(Number.isFinite);
+  scores.overall = clamp(scored.reduce((sum, score) => sum + score, 0) / scored.length);
+
+  return {
+    ...analysis,
+    scores,
+    corrections: Array.isArray(feedback.corrections) ? feedback.corrections.slice(0, 3) : analysis.corrections,
+    encouragement: feedback.encouragement || null,
+    assessmentMode: "ai"
+  };
+}
+
 export function summarize(messages) {
   const analyses = messages.filter(m => m.role === "user").map(m => m.analysis);
   const avg = key => {
