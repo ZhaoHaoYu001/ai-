@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs";
-import { extname, join, normalize } from "node:path";
+import { extname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCoachService } from "./ai-service.js";
 
@@ -13,33 +13,56 @@ const types = {
 };
 
 function json(response, status, body) {
-  response.writeHead(status, { "Content-Type": types[".json"] });
+  response.writeHead(status, {
+    "Content-Type": types[".json"],
+    "X-Content-Type-Options": "nosniff"
+  });
   response.end(JSON.stringify(body));
+}
+
+function requestError(status, message) {
+  return Object.assign(new Error(message), { status });
 }
 
 function readJson(request, limit = 64 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    let failed = false;
     request.on("data", chunk => {
+      if (failed) return;
       size += chunk.length;
       if (size > limit) {
-        reject(new Error("Request body is too large"));
-        request.destroy();
+        failed = true;
+        reject(requestError(413, "Request body is too large"));
       } else chunks.push(chunk);
     });
     request.on("end", () => {
+      if (failed) return;
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
       } catch {
-        reject(new Error("Request body must be valid JSON"));
+        reject(requestError(400, "Request body must be valid JSON"));
       }
     });
     request.on("error", reject);
   });
 }
 
+function validateCoachPayload(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  if (typeof payload.answer !== "string" || !payload.answer.trim() || payload.answer.length > 2000) return false;
+  if (typeof payload.scenario?.title !== "string" || !payload.scenario.title.trim() || payload.scenario.title.length > 100) return false;
+  if (!Array.isArray(payload.messages) || payload.messages.length > 12) return false;
+  return payload.messages.every(message =>
+    ["coach", "user"].includes(message?.role) &&
+    typeof message.text === "string" &&
+    message.text.length <= 2000
+  );
+}
+
 export function createAppServer(root = process.cwd(), { coachService = createCoachService() } = {}) {
+  const rootPath = resolve(root);
   return createServer(async (request, response) => {
     if (request.url === "/health") {
       json(response, 200, { status: "ok", app: "FluentLoop", ai: coachService.available });
@@ -48,23 +71,26 @@ export function createAppServer(root = process.cwd(), { coachService = createCoa
 
     if (request.url === "/api/coach" && request.method === "POST") {
       try {
-        const payload = await readJson(request);
-        if (!payload?.scenario?.title || !payload?.answer || !Array.isArray(payload.messages)) {
-          json(response, 400, { error: "scenario, messages, and answer are required" });
-          return;
+        if (!request.headers["content-type"]?.startsWith("application/json")) {
+          throw requestError(415, "Content-Type must be application/json");
         }
+        const payload = await readJson(request);
+        if (!validateCoachPayload(payload)) throw requestError(400, "Invalid coach request");
         json(response, 200, await coachService.respond(payload));
       } catch (error) {
-        json(response, coachService.available ? 502 : 503, { error: error.message });
+        const status = error.status || (coachService.available ? 502 : 503);
+        const message = error.status ? error.message : "Coach service is temporarily unavailable";
+        json(response, status, { error: message });
       }
       return;
     }
 
     const pathname = decodeURIComponent((request.url || "/").split("?")[0]);
     const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-    const filePath = normalize(join(root, relativePath));
+    const filePath = resolve(rootPath, relativePath);
+    const pathFromRoot = relative(rootPath, filePath);
 
-    if (!filePath.startsWith(normalize(root))) {
+    if (pathFromRoot.startsWith("..") || isAbsolute(pathFromRoot)) {
       response.writeHead(403);
       response.end("Forbidden");
       return;
@@ -77,6 +103,7 @@ export function createAppServer(root = process.cwd(), { coachService = createCoa
         return;
       }
       response.setHeader("Content-Type", types[extname(filePath)] || "application/octet-stream");
+      response.setHeader("X-Content-Type-Options", "nosniff");
       response.end(content);
     });
   });
