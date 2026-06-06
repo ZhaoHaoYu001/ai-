@@ -87,7 +87,7 @@ export function createAppServer(root = process.cwd(), {
   const rootPath = resolve(root);
   return createServer(async (request, response) => {
     if (request.url === "/health") {
-      json(response, 200, { status: "ok", app: "FluentLoop", ai: coachService.available, pronunciation: pronunciationService.available });
+      json(response, 200, { status: "ok", app: "FluentLoop", ai: coachService.available, aiProvider: coachService.available ? coachService.provider : null, aiModel: coachService.available ? coachService.model : null, pronunciation: pronunciationService.available });
       return;
     }
 
@@ -98,7 +98,8 @@ export function createAppServer(root = process.cwd(), {
         }
         const payload = await readJson(request);
         if (!validateCoachPayload(payload)) throw requestError(400, "Invalid coach request");
-        json(response, 200, await coachService.respond(payload));
+        const result = await coachService.respond(payload);
+        json(response, 200, { ...result, provider: coachService.provider, model: coachService.model });
       } catch (error) {
         const status = error.status || (coachService.available ? 502 : 503);
         const message = error.status ? error.message : "Coach service is temporarily unavailable";
@@ -116,7 +117,7 @@ export function createAppServer(root = process.cwd(), {
         response.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache" });
         ndjson(response, { type: "accepted" });
         const result = await coachService.respondStream(payload, delta => ndjson(response, { type: "delta", delta }));
-        ndjson(response, { type: "final", result });
+        ndjson(response, { type: "final", result: { ...result, provider: coachService.provider, model: coachService.model } });
         response.end();
       } catch (error) {
         if (!response.headersSent) json(response, error.status || (coachService.available ? 502 : 503), { error: error.status ? error.message : "Coach stream is temporarily unavailable" });
@@ -186,7 +187,7 @@ export function startServer({
   server.listen(port, host, () => {
     console.log(`FluentLoop is running at http://${host}:${port}`);
     console.log(`Health check: http://${host}:${port}/health`);
-    console.log(`AI Coach: ${coachService.available ? "OpenAI enabled" : "offline fallback (set OPENAI_API_KEY to enable)"}`);
+    console.log(`AI Coach: ${coachService.available ? `${coachService.provider} / ${coachService.model}` : "offline fallback (set ANTHROPIC_AUTH_TOKEN or OPENAI_API_KEY to enable)"}`);
     console.log(`Pronunciation: ${pronunciationService.available ? "Azure Speech enabled" : "browser proxy (set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable)"}`);
     console.log("Keep this window open while using the app. Press Ctrl+C to stop.");
   });

@@ -28,7 +28,7 @@ test("exposes a health endpoint for startup diagnosis", async () => {
   await withServer(async baseUrl => {
     const response = await fetch(`${baseUrl}/health`);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { status: "ok", app: "FluentLoop", ai: false, pronunciation: false });
+    assert.deepEqual(await response.json(), { status: "ok", app: "FluentLoop", ai: false, aiProvider: null, aiModel: null, pronunciation: false });
   });
 });
 
@@ -152,6 +152,8 @@ test("serves Azure pronunciation results through the protected endpoint", async 
 test("streams coach progress and final results as NDJSON", async () => {
   const coachService = {
     available: true,
+    provider: "anthropic",
+    model: "mimo-v2.5",
     async respondStream(_payload, onDelta) {
       onDelta("{");
       return { coachReply: "Next question?", translation: "下一个问题？", feedback: {} };
@@ -169,6 +171,8 @@ test("streams coach progress and final results as NDJSON", async () => {
     });
     const events = (await response.text()).trim().split("\n").map(line => JSON.parse(line));
     assert.deepEqual(events.map(event => event.type), ["accepted", "delta", "final"]);
+    assert.equal(events[2].result.provider, "anthropic");
+    assert.equal(events[2].result.model, "mimo-v2.5");
   } finally {
     server.close();
     await once(server, "close");

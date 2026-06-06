@@ -3,7 +3,7 @@ import { analyze, applyAiFeedback, reply } from "./coach.js";
 export function createAiCoachClient({
   endpoint = "/api/coach/stream",
   request = globalThis.fetch,
-  timeoutMs = 12_000
+  timeoutMs = 60_000
 } = {}) {
   return {
     async respond({ scenario, messages, text, seconds, speechEvidence }) {
@@ -57,6 +57,8 @@ export function createAiCoachClient({
         } else result = await response.json();
         return {
           mode: "ai",
+          provider: result.provider || "ai",
+          model: result.model || null,
           analysis: applyAiFeedback(localAnalysis, result.feedback),
           latency: { firstByteMs, aiMs: Math.round(performance.now() - startedAt), transport: response.body?.getReader ? "stream" : "json" },
           coach: {
@@ -68,6 +70,8 @@ export function createAiCoachClient({
         const turn = messages.filter(message => message.role === "user").length;
         return {
           mode: "offline",
+          provider: null,
+          model: null,
           analysis: localAnalysis,
           latency: { firstByteMs, aiMs: Math.round(performance.now() - startedAt), transport: "offline" },
           coach: { text: reply(scenario, turn, text) }
