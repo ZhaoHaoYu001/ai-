@@ -48,3 +48,26 @@ test("AI coach is unavailable without a server-side key", async () => {
   assert.equal(service.available, false);
   await assert.rejects(service.respond(payload), /OPENAI_API_KEY/);
 });
+
+test("AI coach streams structured output deltas", async () => {
+  const parts = [
+    JSON.stringify({ coachReply: "Tell me more.", translation: "请继续。", feedback: { encouragement: "很好。", grammarScore: 90, vocabularyScore: 88, corrections: [] } }).slice(0, 50),
+    JSON.stringify({ coachReply: "Tell me more.", translation: "请继续。", feedback: { encouragement: "很好。", grammarScore: 90, vocabularyScore: 88, corrections: [] } }).slice(50)
+  ];
+  const service = createCoachService({
+    apiKey: "test-key",
+    request: async (_url, options) => ({
+      ok: true,
+      body: {
+        async *[Symbol.asyncIterator]() {
+          for (const delta of parts) yield new TextEncoder().encode(`data: ${JSON.stringify({ type: "response.output_text.delta", delta })}\n\n`);
+        }
+      },
+      requestedBody: options.body
+    })
+  });
+  const deltas = [];
+  const result = await service.respondStream(payload, delta => deltas.push(delta));
+  assert.equal(result.feedback.grammarScore, 90);
+  assert.equal(deltas.length, 2);
+});

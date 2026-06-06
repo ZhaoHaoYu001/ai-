@@ -55,3 +55,28 @@ test("browser AI client times out and falls back without blocking the session", 
   assert.equal(result.mode, "offline");
   assert.match(result.coach.text, /achievement/i);
 });
+
+test("browser AI client consumes NDJSON streaming results and reports latency", async () => {
+  const encoder = new TextEncoder();
+  const result = {
+    coachReply: "What happened next?",
+    translation: "接下来发生了什么？",
+    feedback: { encouragement: "表达清楚。", grammarScore: 92, vocabularyScore: 90, corrections: [] }
+  };
+  const client = createAiCoachClient({
+    request: async () => ({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: "accepted" })}\n`));
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: "final", result })}\n`));
+          controller.close();
+        }
+      })
+    })
+  });
+  const response = await client.respond(context);
+  assert.equal(response.mode, "ai");
+  assert.equal(response.latency.transport, "stream");
+  assert.ok(Number.isFinite(response.latency.firstByteMs));
+});

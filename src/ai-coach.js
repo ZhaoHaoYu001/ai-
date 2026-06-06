@@ -1,13 +1,15 @@
 import { analyze, applyAiFeedback, reply } from "./coach.js";
 
 export function createAiCoachClient({
-  endpoint = "/api/coach",
+  endpoint = "/api/coach/stream",
   request = globalThis.fetch,
   timeoutMs = 12_000
 } = {}) {
   return {
     async respond({ scenario, messages, text, seconds, speechEvidence }) {
       const localAnalysis = analyze(text, seconds, speechEvidence);
+      const startedAt = performance.now();
+      let firstByteMs = null;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -32,10 +34,31 @@ export function createAiCoachClient({
         });
 
         if (!response.ok) throw new Error(`AI Coach failed: ${response.status}`);
-        const result = await response.json();
+        let result;
+        if (response.body?.getReader) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let pending = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (firstByteMs === null) firstByteMs = Math.round(performance.now() - startedAt);
+            pending += decoder.decode(value, { stream: true });
+            const lines = pending.split("\n");
+            pending = lines.pop() || "";
+            for (const line of lines) {
+              if (!line) continue;
+              const event = JSON.parse(line);
+              if (event.type === "final") result = event.result;
+              if (event.type === "error") throw new Error(event.error);
+            }
+          }
+          if (!result) throw new Error("AI stream ended without a final result");
+        } else result = await response.json();
         return {
           mode: "ai",
           analysis: applyAiFeedback(localAnalysis, result.feedback),
+          latency: { firstByteMs, aiMs: Math.round(performance.now() - startedAt), transport: response.body?.getReader ? "stream" : "json" },
           coach: {
             text: result.coachReply,
             translation: result.translation
@@ -46,6 +69,7 @@ export function createAiCoachClient({
         return {
           mode: "offline",
           analysis: localAnalysis,
+          latency: { firstByteMs, aiMs: Math.round(performance.now() - startedAt), transport: "offline" },
           coach: { text: reply(scenario, turn, text) }
         };
       } finally {

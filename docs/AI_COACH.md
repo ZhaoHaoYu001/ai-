@@ -43,3 +43,6 @@ evidence.
 - Failed model calls automatically fall back to the local deterministic coach.
 - Browser requests time out after 12 seconds and fall back instead of blocking the session.
 - Consecutive learner answers are queued, and late replies from a finished session are ignored.
+- `/api/coach/stream` forwards Responses API output deltas as NDJSON and ends with
+  a structured final event. The UI records transport first-byte time, AI
+  completion time, pronunciation-assessment time, and total turn latency.
