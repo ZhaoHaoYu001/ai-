@@ -157,13 +157,17 @@ npm run test:e2e
 - [PR #14](https://github.com/ZhaoHaoYu001/ai-/pull/14)：可解释评分
 - [PR #15](https://github.com/ZhaoHaoYu001/ai-/pull/15)：个性化课后报告
 - [PR #16](https://github.com/ZhaoHaoYu001/ai-/pull/16)：对话状态韧性
+- [PR #18](https://github.com/ZhaoHaoYu001/ai-/pull/18)：Azure 单词与音素级发音评测
+- [PR #19](https://github.com/ZhaoHaoYu001/ai-/pull/19)：流式 AI 与端到端延迟指标
+- [PR #20](https://github.com/ZhaoHaoYu001/ai-/pull/20)：真实 Chromium E2E 质量门禁
 
 ## 第三方依赖与原创说明
 
-- 运行时无第三方 JavaScript 库或框架。
+- 产品运行时无第三方 JavaScript 库或框架；开发测试使用 `@playwright/test`。
 - 使用浏览器标准能力：Web Speech API、Speech Synthesis API、LocalStorage。
 - 使用 MediaRecorder 与 Web Audio API 采集真实音频信号并提供本地录音回放；默认不上传音频。
 - 可选使用 OpenAI Responses API 提供上下文角色对话与结构化语言反馈；API Key 仅保存在本地服务端环境变量中。
+- 可选使用 Azure Speech Pronunciation Assessment 提供单词、音素、重音和韵律反馈；密钥仅保存在本地服务端环境变量中。
 - 页面设计、场景数据、对话逻辑、评分逻辑、纠错规则、报告系统及全部代码均为本项目原创实现。
 - 浏览器语音识别的可用性取决于浏览器和网络环境。
 
