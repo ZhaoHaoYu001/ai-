@@ -1,5 +1,25 @@
 # Explicit Voice Turns
 
+## Phone-call mode
+
+The default interaction now presents the existing explicit learner turns as a
+continuous AI phone call:
+
+1. Entering a scene connects the call and plays the Coach opening.
+2. When Coach playback ends, FluentLoop automatically starts the learner turn.
+3. A local voice-activity gate waits until speech is detected, then treats
+   roughly 1.4 seconds of silence as the end of the answer.
+4. The completed turn is transcribed, assessed, corrected, and sent to the AI.
+5. The AI response is played and the next learner turn starts automatically.
+
+The gate never submits silence before the learner has spoken. A manual
+**Finish turn** control remains available when background noise prevents clean
+silence detection. **Hang up and view report** ends the call and generates the
+same measurable learning report, recording playback, and next-step guidance.
+
+Grammar, expression, and pronunciation feedback appears only after the learner
+finishes a turn, so coaching remains precise without interrupting speech.
+
 ## Interaction model
 
 FluentLoop uses an explicit, half-duplex learner-turn pattern instead of an

@@ -7,7 +7,7 @@
     "start": "node server.js",
     "test": "node --test",
     "test:e2e": "playwright test",
-    "check": "node --test && node --check src/app.js && node --check src/ai-coach.js && node --check src/voice.js && node --check src/transcription.js && node --check src/speech-assessment.js && node --check ai-service.js && node --check pronunciation-service.js && node --check transcription-service.js && node --check scripts/launch-fluentloop.mjs && node --check server.js",
+    "check": "node --test && node --check src/app.js && node --check src/ai-coach.js && node --check src/voice.js && node --check src/phone-call.js && node --check src/transcription.js && node --check src/speech-assessment.js && node --check ai-service.js && node --check pronunciation-service.js && node --check transcription-service.js && node --check scripts/launch-fluentloop.mjs && node --check server.js",
     "check:all": "npm run check && npm run test:e2e"
   },
   "devDependencies": {
