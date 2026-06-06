@@ -17,6 +17,21 @@ This interaction is similar to push-to-talk and voice-assistant turn taking. It
 is more predictable in classrooms, shared rooms, and other environments where
 an always-on microphone can capture unrelated speech.
 
+## In-turn speaking scaffold
+
+Starting a recording does not remove learning support. A persistent reference
+card remains visible above the controls and provides:
+
+- the current Coach question;
+- correct sentence starters for structuring an answer;
+- useful scenario vocabulary;
+- one natural example answer.
+
+The reference card is read-only during recording, so it cannot overwrite or
+submit the learner's active voice turn. The separate correction-demo button is
+disabled during recording because it intentionally contains mistakes for
+showing the feedback system.
+
 ## Recognition lifecycle
 
 The Web Speech API exposes `continuous`, but browser recognition services may
