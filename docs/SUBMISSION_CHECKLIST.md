@@ -22,6 +22,7 @@ Then verify:
 
 - [ ] GitHub Actions is green on `main`
 - [ ] `git status` is clean
+- [ ] `npm.cmd run check:all` passes unit, integration, and Chromium E2E tests
 - [ ] No API keys, credentials, recordings, or personal data are committed
 - [ ] Every feature PR targets `main` and has a complete description
 - [ ] All commit timestamps are inside the selected competition batch
@@ -33,7 +34,9 @@ Then verify:
 - [ ] Complete a microphone flow in current Chrome or Edge
 - [ ] Show interim speech transcription and Coach playback controls
 - [ ] Explain that browser clarity is a proxy, not phoneme accuracy
+- [ ] With Azure configured, show word, IPA phoneme, and prosody diagnostics
 - [ ] Show contextual AI mode and the offline fallback label
+- [ ] Show streaming AI and per-stage latency metrics
 - [ ] Finish a session and show recording playback, personalized insights, and growth calendar
 
 ## Demo video
