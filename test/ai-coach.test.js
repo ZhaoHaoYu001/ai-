@@ -17,6 +17,8 @@ test("browser AI client applies contextual model feedback", async () => {
       ok: true,
       async json() {
         return {
+          provider: "anthropic",
+          model: "mimo-v2.5",
           coachReply: "What measurable result did the launch achieve?",
           translation: "这次发布取得了什么可量化成果？",
           feedback: {
@@ -32,6 +34,8 @@ test("browser AI client applies contextual model feedback", async () => {
 
   const result = await client.respond(context);
   assert.equal(result.mode, "ai");
+  assert.equal(result.provider, "anthropic");
+  assert.equal(result.model, "mimo-v2.5");
   assert.equal(result.analysis.assessmentMode, "ai");
   assert.equal(result.analysis.scores.grammar, 96);
   assert.match(result.coach.text, /measurable result/);
@@ -41,6 +45,7 @@ test("browser AI client clearly falls back when the service is unavailable", asy
   const client = createAiCoachClient({ request: async () => ({ ok: false, status: 503 }) });
   const result = await client.respond(context);
   assert.equal(result.mode, "offline");
+  assert.equal(result.provider, null);
   assert.match(result.coach.text, /achievement/i);
 });
 

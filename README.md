@@ -6,7 +6,7 @@ FluentLoop 是一款面向真实交流场景的英语口语练习工具。它通
 
 > Demo 视频：待录制后将可访问链接更新在此处。
 
-> AI 模式：配置服务端 `OPENAI_API_KEY` 后，Coach 会基于最近对话上下文生成角色追问、语境化纠错和表达反馈；未配置或请求失败时，界面会明确标记并降级为离线规则模式。
+> AI 模式：配置服务端 Anthropic Messages API 兼容凭据或 `OPENAI_API_KEY` 后，Coach 会基于最近对话上下文生成角色追问、语境化纠错和表达反馈；未配置或请求失败时，界面会明确标记并降级为离线规则模式。
 
 ## 在线体验
 
@@ -17,6 +17,15 @@ npm start
 ```
 
 启用真实 AI 对话与纠错：
+
+```powershell
+$env:ANTHROPIC_BASE_URL="https://your-compatible-endpoint/anthropic"
+$env:ANTHROPIC_AUTH_TOKEN="your-token"
+$env:ANTHROPIC_MODEL="mimo-v2.5"
+npm.cmd start
+```
+
+也可使用 OpenAI Responses API：
 
 ```powershell
 $env:OPENAI_API_KEY="your-api-key"
@@ -100,7 +109,7 @@ flowchart LR
 .
 ├── index.html            # 应用入口
 ├── server.js             # 静态服务与受保护的 AI Coach 接口
-├── ai-service.js         # OpenAI Responses API 服务端适配器
+├── ai-service.js         # Anthropic-compatible / OpenAI 服务端适配器
 ├── pronunciation-service.js # Azure Speech 发音评测适配器
 ├── src/
 │   ├── app.js            # 页面状态与交互流程
@@ -140,7 +149,7 @@ npm run test:e2e
 1. 运行 `npm start`，打开 `http://127.0.0.1:4173`。
 2. 选择“求职面试”，点击“填入演示回答”并发送，验证离线纠错和评分。
 3. 在 Chrome / Edge 允许麦克风，验证持续转写、语音播放控制和清晰度代理。
-4. 可选配置 `OPENAI_API_KEY`，验证上下文追问和语境化反馈。
+4. 可选配置 Anthropic-compatible 凭据或 `OPENAI_API_KEY`，验证上下文追问和语境化反馈。
 5. 结束练习，验证录音回放、个性化课后洞察和成长日历。
 
 完整提交检查表见 [`docs/SUBMISSION_CHECKLIST.md`](docs/SUBMISSION_CHECKLIST.md)。
@@ -166,7 +175,7 @@ npm run test:e2e
 - 产品运行时无第三方 JavaScript 库或框架；开发测试使用 `@playwright/test`。
 - 使用浏览器标准能力：Web Speech API、Speech Synthesis API、LocalStorage。
 - 使用 MediaRecorder 与 Web Audio API 采集真实音频信号并提供本地录音回放；默认不上传音频。
-- 可选使用 OpenAI Responses API 提供上下文角色对话与结构化语言反馈；API Key 仅保存在本地服务端环境变量中。
+- 可选使用 Anthropic Messages API 兼容服务（已验证 `mimo-v2.5`）或 OpenAI Responses API 提供上下文角色对话与结构化语言反馈；API Key 仅保存在本地服务端环境变量中。
 - 可选使用 Azure Speech Pronunciation Assessment 提供单词、音素、重音和韵律反馈；密钥仅保存在本地服务端环境变量中。
 - 页面设计、场景数据、对话逻辑、评分逻辑、纠错规则、报告系统及全部代码均为本项目原创实现。
 - 浏览器语音识别的可用性取决于浏览器和网络环境。

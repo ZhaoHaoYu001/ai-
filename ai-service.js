@@ -66,6 +66,16 @@ function outputText(response) {
   throw new Error("AI response did not contain output text");
 }
 
+function parseStructuredText(text) {
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Some compatible models occasionally emit trailing commas despite a strict JSON prompt.
+    return JSON.parse(trimmed.replace(/,\s*([}\]])/g, "$1"));
+  }
+}
+
 function responseBody(model, payload, stream = false) {
   return {
     model,
@@ -82,40 +92,66 @@ function responseBody(model, payload, stream = false) {
   };
 }
 
+function anthropicEndpoint(baseUrl) {
+  return `${String(baseUrl).replace(/\/+$/, "")}/v1/messages`;
+}
+
+function anthropicBody(model, payload, stream = false) {
+  return {
+    model,
+    max_tokens: 2400,
+    stream,
+    system: `Return only compact valid JSON matching this JSON Schema. Do not include markdown, comments, or analysis:\n${JSON.stringify(responseSchema)}`,
+    messages: [{ role: "user", content: buildPrompt(payload) }]
+  };
+}
+
 export function createCoachService({
-  apiKey = process.env.OPENAI_API_KEY,
-  model = process.env.OPENAI_MODEL || "gpt-5.4-mini",
+  provider = process.env.ANTHROPIC_AUTH_TOKEN ? "anthropic" : "openai",
+  apiKey = provider === "anthropic" ? process.env.ANTHROPIC_AUTH_TOKEN : process.env.OPENAI_API_KEY,
+  baseUrl = provider === "anthropic" ? (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com") : "https://api.openai.com",
+  model = provider === "anthropic" ? (process.env.ANTHROPIC_MODEL || "mimo-v2.5") : (process.env.OPENAI_MODEL || "gpt-5.4-mini"),
   request = globalThis.fetch
 } = {}) {
+  const headers = provider === "anthropic" ? {
+    Authorization: `Bearer ${apiKey}`,
+    "x-api-key": apiKey,
+    "anthropic-version": "2023-06-01",
+    "Content-Type": "application/json"
+  } : {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json"
+  };
   return {
+    provider,
+    model,
     available: Boolean(apiKey),
     async respond(payload) {
-      if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+      if (!apiKey) throw new Error(`${provider} API credential is not configured`);
 
-      const response = await request("https://api.openai.com/v1/responses", {
+      const response = await request(provider === "anthropic" ? anthropicEndpoint(baseUrl) : `${baseUrl}/v1/responses`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(responseBody(model, payload))
+        headers,
+        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload) : responseBody(model, payload))
       });
 
       if (!response.ok) {
         const detail = await response.text();
-        throw new Error(`OpenAI request failed (${response.status}): ${detail.slice(0, 200)}`);
+        throw new Error(`${provider} request failed (${response.status}): ${detail.slice(0, 200)}`);
       }
-
-      return JSON.parse(outputText(await response.json()));
+      const result = await response.json();
+      const text = provider === "anthropic" ? result.content?.find(item => item.type === "text")?.text : outputText(result);
+      if (!text) throw new Error(`${provider} response did not contain output text`);
+      return parseStructuredText(text);
     },
     async respondStream(payload, onDelta = () => {}) {
-      if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
-      const response = await request("https://api.openai.com/v1/responses", {
+      if (!apiKey) throw new Error(`${provider} API credential is not configured`);
+      const response = await request(provider === "anthropic" ? anthropicEndpoint(baseUrl) : `${baseUrl}/v1/responses`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(responseBody(model, payload, true))
+        headers,
+        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload, true) : responseBody(model, payload, true))
       });
-      if (!response.ok || !response.body) throw new Error(`OpenAI streaming request failed (${response.status})`);
+      if (!response.ok || !response.body) throw new Error(`${provider} streaming request failed (${response.status})`);
 
       const decoder = new TextDecoder();
       let pending = "";
@@ -128,13 +164,15 @@ export function createCoachService({
           const data = event.split("\n").find(line => line.startsWith("data: "))?.slice(6);
           if (!data || data === "[DONE]") continue;
           const parsed = JSON.parse(data);
-          if (parsed.type === "response.output_text.delta" && typeof parsed.delta === "string") {
-            output += parsed.delta;
-            onDelta(parsed.delta);
+          const delta = provider === "anthropic" && parsed.type === "content_block_delta" ? parsed.delta?.text :
+            parsed.type === "response.output_text.delta" ? parsed.delta : null;
+          if (typeof delta === "string") {
+            output += delta;
+            onDelta(delta);
           }
         }
       }
-      return JSON.parse(output);
+      return parseStructuredText(output);
     }
   };
 }
