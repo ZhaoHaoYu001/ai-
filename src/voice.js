@@ -62,6 +62,10 @@ export function recognitionTranscript(results) {
   };
 }
 
+export function appendTurnTranscript(currentText, nextText) {
+  return `${currentText || ""} ${nextText || ""}`.replace(/\s+/g, " ").trim();
+}
+
 export function encodePcmWav(chunks, inputSampleRate, outputSampleRate = 16000) {
   const input = new Float32Array(chunks.reduce((size, chunk) => size + chunk.length, 0));
   let offset = 0;
@@ -122,12 +126,14 @@ export async function createAudioCapture() {
   sample();
 
   const chunks = [];
-  let utteranceStart = 0;
   const recorder = new MediaRecorder(stream);
   recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
   recorder.start(1000);
 
   return {
+    beginUtterance() {
+      utterancePcmStart = pcmChunks.length;
+    },
     snapshot() {
       const recent = levels.slice(-120);
       return {
@@ -139,7 +145,6 @@ export async function createAudioCapture() {
     utteranceBlob() {
       const blob = encodePcmWav(pcmChunks.slice(utterancePcmStart), context.sampleRate);
       utterancePcmStart = pcmChunks.length;
-      utteranceStart = chunks.length;
       return blob;
     },
     stop() {

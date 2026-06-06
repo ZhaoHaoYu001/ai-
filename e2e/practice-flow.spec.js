@@ -30,6 +30,26 @@ async function mockBrowserVoice(page) {
   });
 }
 
+async function mockTurnRecognition(page) {
+  await page.addInitScript(() => {
+    window.__speechInstances = [];
+    window.__emitFinalSpeech = text => {
+      const instance = window.__speechInstances.at(-1);
+      instance.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: text, confidence: .92 } }]
+      });
+    };
+    window.__endRecognition = () => window.__speechInstances.at(-1).onend?.();
+    class MockSpeechRecognition {
+      constructor() { window.__speechInstances.push(this); }
+      start() {}
+      stop() { this.onend?.(); }
+    }
+    Object.defineProperty(window, "SpeechRecognition", { configurable: true, value: MockSpeechRecognition });
+  });
+}
+
 test("completes the full text fallback practice flow", async ({ page }) => {
   await mockBrowserVoice(page);
   await page.goto("/");
@@ -48,8 +68,27 @@ test("falls back cleanly when microphone permission is denied", async ({ page })
   await mockBrowserVoice(page);
   await page.goto("/");
   await page.getByText("餐厅点餐", { exact: true }).click();
-  await expect(page.getByRole("button", { name: "● 开启持续转写" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "● 开始语音回答" })).toBeVisible();
   await expect(page.getByPlaceholder("也可以输入英文回答…")).toBeEnabled();
+});
+
+test("keeps speech across recognition reconnects and sends one explicit turn", async ({ page }) => {
+  await mockBrowserVoice(page);
+  await mockTurnRecognition(page);
+  await page.goto("/");
+  await page.getByText("求职面试", { exact: true }).click();
+  await page.getByRole("button", { name: "● 开始语音回答" }).click();
+  await page.evaluate(() => window.__emitFinalSpeech("I led the launch"));
+  await page.evaluate(() => window.__endRecognition());
+  await expect(page.getByRole("button", { name: "■ 结束回答并发送" })).toBeVisible();
+  await page.waitForTimeout(450);
+  await page.evaluate(() => window.__emitFinalSpeech("and increased adoption"));
+  await expect(page.getByText("I led the launch and increased adoption", { exact: true })).toBeVisible();
+  await expect(page.locator(".msg.user")).toHaveCount(0);
+  await page.getByRole("button", { name: "■ 结束回答并发送" }).click();
+  await expect(page.locator(".msg.user>div>p")).toContainText("I led the launch and increased adoption");
+  await expect(page.locator(".msg.user")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "● 开始语音回答" })).toBeVisible();
 });
 
 test("keeps the core practice workflow usable on a mobile viewport", async ({ page }) => {

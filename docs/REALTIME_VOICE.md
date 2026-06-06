@@ -1,19 +1,56 @@
-# Real-time Voice Conversation
+# Explicit Voice Turns
 
-## Controls
+## Interaction model
 
-- Continuous transcription starts with the training session and can be disabled
-  from the conversation header.
-- Interim English speech is shown live before a sentence becomes final.
-- Final speech is converted into a user message and analyzed automatically.
-- Coach speech can be played, paused, resumed, or stopped at any time.
-- Chinese translation appears below every Coach message.
+FluentLoop uses an explicit, half-duplex learner-turn pattern instead of an
+always-on microphone:
 
-## Echo and latency strategy
+1. The learner clicks **Start voice answer**.
+2. SpeechRecognition and microphone audio are collected for the current turn.
+3. Pauses and browser recognition restarts do not submit partial answers.
+4. Final and interim transcript segments remain visible and are accumulated.
+5. The learner clicks **Finish answer and send** once the answer is complete.
+6. One transcript, one learner-audio segment, and one assessment request are
+   submitted to the AI Coach.
 
-The browser microphone pauses while Coach text-to-speech is playing to avoid
-recognizing speaker audio as the learner's answer. When Coach speech ends or is
-stopped, continuous transcription resumes automatically.
+This interaction is similar to push-to-talk and voice-assistant turn taking. It
+is more predictable in classrooms, shared rooms, and other environments where
+an always-on microphone can capture unrelated speech.
 
-This implementation uses browser Web Speech and Speech Synthesis APIs, so it
-requires microphone permission and works best in current Chrome or Edge.
+## Recognition lifecycle
+
+The Web Speech API exposes `continuous`, but browser recognition services may
+still end a recognition session. FluentLoop treats that as an internal
+transport event:
+
+- the visible learner turn remains active;
+- finalized transcript text remains in the turn buffer;
+- any interim text is preserved before reconnecting;
+- recognition restarts silently after a short delay;
+- only an explicit learner action sends the answer.
+
+This avoids the old start/stop UI loop and prevents one spoken answer from
+becoming several short AI messages.
+
+References:
+
+- [Web Speech API specification](https://webaudio.github.io/web-speech-api/)
+- [MDN SpeechRecognition](https://developer.mozilla.org/docs/Web/API/SpeechRecognition)
+
+## Audio boundaries and feedback
+
+Microphone permission is requested only when the learner starts a voice answer.
+The audio-capture adapter marks the start of each learner turn, so
+pronunciation assessment receives only that turn rather than Coach playback or
+waiting time. Coach text-to-speech is disabled while a learner turn is active.
+
+When microphone audio capture is unavailable but browser speech recognition
+still works, FluentLoop keeps the transcript flow usable and clearly explains
+that pronunciation evidence is unavailable. Text input remains the final
+fallback.
+
+## Verification
+
+The Chromium E2E suite simulates a browser recognition service ending during a
+learner answer. It verifies that FluentLoop reconnects, preserves both speech
+segments, and sends exactly one explicit learner turn.
