@@ -7,14 +7,23 @@ test("browser evidence is clearly labeled as a proxy", () => {
   assert.equal(evidence.level, "clarity-proxy");
   assert.match(evidence.disclaimer, /不代表音素/);
   assert.ok(evidence.clarity > 70);
+  assert.equal(evidence.practiceTips.length, 1);
 });
 
 test("professional evidence preserves word and phoneme diagnostics", () => {
-  const evidence = createProfessionalEvidence({ provider: "demo", overall: 88, accuracy: 84, fluency: 90, completeness: 92, prosody: 79, words: [{ word: "hello", score: 82 }], phonemes: [{ phoneme: "h", score: 80 }] });
+  const evidence = createProfessionalEvidence({ provider: "demo", overall: 78, accuracy: 72, fluency: 90, completeness: 92, prosody: 79, words: [{ word: "launch", score: 58, errorType: "Mispronunciation", phonemes: [{ phoneme: "l", score: 55 }] }, { word: "hello", score: 82 }], phonemes: [{ phoneme: "h", score: 80 }] });
   assert.equal(evidence.level, "phoneme");
   assert.equal(evidence.prosody, 79);
-  assert.equal(evidence.words.length, 1);
+  assert.equal(evidence.words.length, 2);
   assert.equal(evidence.phonemes.length, 1);
+  assert.equal(evidence.focusWords[0].word, "launch");
+  assert.match(evidence.practiceTips[0], /launch/);
+});
+
+test("browser evidence recommends concrete recording improvements", () => {
+  const evidence = createBrowserSpeechEvidence({ confidence: .45, averageLevel: .05, peakLevel: .1, activeRatio: .2 });
+  assert.equal(evidence.practiceTips.length, 2);
+  assert.match(evidence.practiceTips.join(" "), /麦克风|连续表达|放慢语速/);
 });
 
 test("assessment client posts WAV audio to the configured provider endpoint", async () => {
