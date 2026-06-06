@@ -164,8 +164,8 @@ export async function createAudioCapture({ timeoutMs = 8000 } = {}) {
     beginUtterance() {
       utterancePcmStart = pcmChunks.length;
     },
-    snapshot() {
-      const recent = levels.slice(-120);
+    snapshot(windowSize = 120) {
+      const recent = levels.slice(-windowSize);
       return {
         averageLevel: recent.length ? recent.reduce((sum, level) => sum + level, 0) / recent.length : 0,
         peakLevel: recent.length ? Math.max(...recent) : 0,

@@ -32,7 +32,7 @@ Then verify:
 - [ ] Select each available scene
 - [ ] Complete the text fallback flow without an API key
 - [ ] Complete a microphone flow in current Chrome or Edge
-- [ ] Show interim speech transcription and Coach playback controls
+- [ ] Show phone-call auto connect, interim transcription, silence auto-submit, and Coach playback
 - [ ] Explain that browser clarity is a proxy, not phoneme accuracy
 - [ ] With Azure configured, show word, IPA phoneme, and prosody diagnostics
 - [ ] Show contextual AI mode and the offline fallback label
