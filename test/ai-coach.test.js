@@ -43,3 +43,15 @@ test("browser AI client clearly falls back when the service is unavailable", asy
   assert.equal(result.mode, "offline");
   assert.match(result.coach.text, /achievement/i);
 });
+
+test("browser AI client times out and falls back without blocking the session", async () => {
+  const client = createAiCoachClient({
+    timeoutMs: 5,
+    request: (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(new Error("aborted")));
+    })
+  });
+  const result = await client.respond(context);
+  assert.equal(result.mode, "offline");
+  assert.match(result.coach.text, /achievement/i);
+});
