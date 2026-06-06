@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { recognitionTranscript, translateCoachText } from "../src/voice.js";
+import { encodePcmWav, recognitionTranscript, translateCoachText } from "../src/voice.js";
 
 test("separates final and interim live speech transcripts", () => {
   const result = recognitionTranscript([
@@ -21,4 +21,12 @@ test("combines translations for a coach bridge and follow-up", () => {
   const translation = translateCoachText(text, "interview");
   assert.match(translation, /理由充分/);
   assert.match(translation, /成就/);
+});
+
+test("encodes browser PCM samples as a 16 kHz WAV for professional assessment", async () => {
+  const wav = encodePcmWav([new Float32Array(4800).fill(.25)], 48000);
+  const bytes = new Uint8Array(await wav.arrayBuffer());
+  assert.equal(new TextDecoder().decode(bytes.slice(0, 4)), "RIFF");
+  assert.equal(new DataView(bytes.buffer).getUint32(24, true), 16000);
+  assert.equal(wav.type, "audio/wav");
 });

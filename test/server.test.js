@@ -28,7 +28,7 @@ test("exposes a health endpoint for startup diagnosis", async () => {
   await withServer(async baseUrl => {
     const response = await fetch(`${baseUrl}/health`);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { status: "ok", app: "FluentLoop", ai: false });
+    assert.deepEqual(await response.json(), { status: "ok", app: "FluentLoop", ai: false, pronunciation: false });
   });
 });
 
@@ -122,4 +122,29 @@ test("returns 404 for missing assets", async () => {
     const response = await fetch(`${baseUrl}/missing.js`);
     assert.equal(response.status, 404);
   });
+});
+
+test("serves Azure pronunciation results through the protected endpoint", async () => {
+  const pronunciationService = {
+    available: true,
+    async assess(audio, text) {
+      return { provider: "azure-speech", overall: 88, audioBytes: audio.length, text };
+    }
+  };
+  const server = createAppServer(process.cwd(), { pronunciationService });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address();
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/pronunciation?text=hello`, {
+      method: "POST",
+      headers: { "Content-Type": "audio/wav" },
+      body: Buffer.from("RIFFdemo")
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { provider: "azure-speech", overall: 88, audioBytes: 8, text: "hello" });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
 });

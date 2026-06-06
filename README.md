@@ -24,7 +24,15 @@ $env:OPENAI_MODEL="gpt-5.4-mini"
 npm.cmd start
 ```
 
-详细接口、隐私与降级策略见 `docs/AI_COACH.md`。
+启用真实单词、音素、重音与韵律评测：
+
+```powershell
+$env:AZURE_SPEECH_KEY="your-speech-resource-key"
+$env:AZURE_SPEECH_REGION="eastus"
+npm.cmd start
+```
+
+详细接口、隐私与降级策略见 `docs/AI_COACH.md` 和 `docs/AZURE_PRONUNCIATION.md`。
 
 打开 `http://localhost:4173`。推荐使用最新版 Chrome 或 Edge，以体验实时英语语音识别和语音合成。
 
@@ -35,7 +43,7 @@ npm.cmd start
 - **语境化 AI 对话与纠错**：配置服务端模型后，Coach 会读取最近对话和场景目标，生成不重复的角色追问，并返回结构化语法、词汇与表达建议。
 - **实时语音对话**：基于 Web Speech API 实现英语语音识别与角色语音合成，无需 API Key。
 - **适时纠错**：不在用户说话中途打断，回答结束后集中展示语法和表达建议。
-- **可信语音评估**：文字输入不生成发音分；语音输入展示明确标记的浏览器清晰度代理，支持接入专业音素级评测。
+- **专业发音评测**：配置 Azure Speech 后展示准确度、流利度、完整度、韵律、具体单词和 IPA 音素问题；未配置时明确降级为浏览器清晰度代理。
 - **录音回放**：训练结束后可回听本次原始录音，复盘停顿、语速和表达清晰度。
 - **课后总结**：展示综合得分、对话轮数、单词数、语速和纠错数量，并给出下一步建议。
 - **个性化学习洞察**：识别本次优势、重点能力、高频错误、历史趋势和下一次复练目标。
@@ -92,6 +100,7 @@ flowchart LR
 ├── index.html            # 应用入口
 ├── server.js             # 静态服务与受保护的 AI Coach 接口
 ├── ai-service.js         # OpenAI Responses API 服务端适配器
+├── pronunciation-service.js # Azure Speech 发音评测适配器
 ├── src/
 │   ├── app.js            # 页面状态与交互流程
 │   ├── ai-coach.js       # 浏览器 AI 客户端与离线降级
@@ -157,6 +166,6 @@ npm run check
 ## 当前边界与后续规划
 
 - 当前 AI Coach 是请求响应式接口，后续可升级为 WebRTC / WebSocket 流式语音链路。
-- 默认发音结果是明确标记的浏览器清晰度代理，后续接入真实音素级服务。
+- Azure Speech 未配置时，发音结果会明确降级为浏览器清晰度代理。
 - 增加可交互的错题复练与掌握状态跟踪。
 - 增加教师端能力报告与分享链接。
