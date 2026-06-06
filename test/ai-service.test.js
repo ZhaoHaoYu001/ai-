@@ -43,6 +43,8 @@ test("AI coach sends context and returns structured feedback", async () => {
   assert.equal(requestBody.text.format.type, "json_schema");
   assert.ok(requestBody.text.format.schema.required.includes("support"));
   assert.match(requestBody.input, /support must respond directly/i);
+  assert.match(requestBody.input, /exact substring/i);
+  assert.equal(requestBody.text.format.schema.properties.feedback.properties.corrections.maxItems, 2);
   assert.match(requestBody.input, /product launch/);
   assert.match(requestBody.input, /Tell me about yourself/);
 });

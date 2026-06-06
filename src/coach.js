@@ -44,7 +44,24 @@ export function reply(scenario, turn, text) {
   return `${bridge} ${scenario.prompts[turn % scenario.prompts.length]}`;
 }
 
-export function applyAiFeedback(analysis, feedback = {}) {
+export function selectMaterialCorrections(answer, corrections, fallback = []) {
+  if (!Array.isArray(corrections)) return fallback.slice(0, 2);
+  const source = String(answer || "").toLowerCase();
+  const seen = new Set();
+  const selected = corrections.filter(correction => {
+    const original = String(correction?.original || "").trim();
+    const improved = String(correction?.improved || "").trim();
+    const reason = String(correction?.reason || "").trim();
+    const key = original.toLowerCase();
+    if (!original || !improved || !reason || seen.has(key)) return false;
+    if (!source.includes(key) || original.toLowerCase() === improved.toLowerCase()) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 2).map(correction => ({ ...correction, timing: "after-turn" }));
+  return selected.length ? selected : fallback.slice(0, 2).map(correction => ({ ...correction, timing: "after-turn" }));
+}
+
+export function applyAiFeedback(analysis, feedback = {}, answer = "") {
   const scores = {
     ...analysis.scores,
     grammar: Number.isFinite(feedback.grammarScore) ? clamp(feedback.grammarScore) : analysis.scores.grammar,
@@ -57,7 +74,7 @@ export function applyAiFeedback(analysis, feedback = {}) {
   return {
     ...analysis,
     scores,
-    corrections: Array.isArray(feedback.corrections) ? feedback.corrections.slice(0, 3) : analysis.corrections,
+    corrections: selectMaterialCorrections(answer, feedback.corrections, analysis.corrections),
     encouragement: feedback.encouragement || null,
     assessmentMode: "ai"
   };
