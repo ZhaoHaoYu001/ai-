@@ -25,11 +25,19 @@ test("serves the FluentLoop app entry point", async () => {
 });
 
 test("exposes a health endpoint for startup diagnosis", async () => {
-  await withServer(async baseUrl => {
-    const response = await fetch(`${baseUrl}/health`);
+  const coachService = { available: false, provider: null, model: null };
+  const server = createAppServer(process.cwd(), { coachService });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address();
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/health`);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { status: "ok", app: "FluentLoop", ai: false, aiProvider: null, aiModel: null, pronunciation: false, transcription: false });
-  });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
 });
 
 test("serves contextual AI coach responses through the protected server endpoint", async () => {

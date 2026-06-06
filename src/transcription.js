@@ -11,7 +11,7 @@ export function createTranscriptionClient({
         body: audio
       });
       const result = await response.json().catch(() => ({}));
-      if (response.status === 503) throw new Error("浏览器未返回转写，且服务端语音转写尚未配置。请配置 Azure Speech 后重试。");
+      if (response.status === 503) throw new Error("语音转写服务未配置。请使用下方文字输入框输入英文回答继续练习，或配置 Azure Speech 后重试语音输入。");
       if (!response.ok) throw new Error(result.error || "Speech transcription failed");
       if (!result.text?.trim()) throw new Error("Speech transcription returned no text");
       return result;

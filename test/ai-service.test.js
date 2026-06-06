@@ -11,6 +11,7 @@ const payload = {
 test("AI coach sends context and returns structured feedback", async () => {
   let requestBody;
   const service = createCoachService({
+    provider: "openai",
     apiKey: "test-key",
     model: "test-model",
     request: async (_url, options) => {
