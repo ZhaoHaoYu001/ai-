@@ -21,6 +21,10 @@ function json(response, status, body) {
   response.end(JSON.stringify(body));
 }
 
+function ndjson(response, body) {
+  response.write(`${JSON.stringify(body)}\n`);
+}
+
 function requestError(status, message) {
   return Object.assign(new Error(message), { status });
 }
@@ -99,6 +103,27 @@ export function createAppServer(root = process.cwd(), {
         const status = error.status || (coachService.available ? 502 : 503);
         const message = error.status ? error.message : "Coach service is temporarily unavailable";
         json(response, status, { error: message });
+      }
+      return;
+    }
+
+    if (request.url === "/api/coach/stream" && request.method === "POST") {
+      try {
+        if (!request.headers["content-type"]?.startsWith("application/json")) throw requestError(415, "Content-Type must be application/json");
+        const payload = await readJson(request);
+        if (!validateCoachPayload(payload)) throw requestError(400, "Invalid coach request");
+        if (!coachService.respondStream) throw new Error("Streaming coach is unavailable");
+        response.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache" });
+        ndjson(response, { type: "accepted" });
+        const result = await coachService.respondStream(payload, delta => ndjson(response, { type: "delta", delta }));
+        ndjson(response, { type: "final", result });
+        response.end();
+      } catch (error) {
+        if (!response.headersSent) json(response, error.status || (coachService.available ? 502 : 503), { error: error.status ? error.message : "Coach stream is temporarily unavailable" });
+        else {
+          ndjson(response, { type: "error", error: "Coach stream is temporarily unavailable" });
+          response.end();
+        }
       }
       return;
     }

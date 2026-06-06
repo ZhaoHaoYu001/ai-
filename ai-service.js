@@ -66,6 +66,22 @@ function outputText(response) {
   throw new Error("AI response did not contain output text");
 }
 
+function responseBody(model, payload, stream = false) {
+  return {
+    model,
+    input: buildPrompt(payload),
+    stream,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "speaking_coach_turn",
+        strict: true,
+        schema: responseSchema
+      }
+    }
+  };
+}
+
 export function createCoachService({
   apiKey = process.env.OPENAI_API_KEY,
   model = process.env.OPENAI_MODEL || "gpt-5.4-mini",
@@ -82,18 +98,7 @@ export function createCoachService({
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          model,
-          input: buildPrompt(payload),
-          text: {
-            format: {
-              type: "json_schema",
-              name: "speaking_coach_turn",
-              strict: true,
-              schema: responseSchema
-            }
-          }
-        })
+        body: JSON.stringify(responseBody(model, payload))
       });
 
       if (!response.ok) {
@@ -102,6 +107,34 @@ export function createCoachService({
       }
 
       return JSON.parse(outputText(await response.json()));
+    },
+    async respondStream(payload, onDelta = () => {}) {
+      if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+      const response = await request("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(responseBody(model, payload, true))
+      });
+      if (!response.ok || !response.body) throw new Error(`OpenAI streaming request failed (${response.status})`);
+
+      const decoder = new TextDecoder();
+      let pending = "";
+      let output = "";
+      for await (const chunk of response.body) {
+        pending += decoder.decode(chunk, { stream: true });
+        const events = pending.split("\n\n");
+        pending = events.pop() || "";
+        for (const event of events) {
+          const data = event.split("\n").find(line => line.startsWith("data: "))?.slice(6);
+          if (!data || data === "[DONE]") continue;
+          const parsed = JSON.parse(data);
+          if (parsed.type === "response.output_text.delta" && typeof parsed.delta === "string") {
+            output += parsed.delta;
+            onDelta(parsed.delta);
+          }
+        }
+      }
+      return JSON.parse(output);
     }
   };
 }

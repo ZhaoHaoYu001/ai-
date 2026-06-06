@@ -148,3 +148,29 @@ test("serves Azure pronunciation results through the protected endpoint", async 
     await once(server, "close");
   }
 });
+
+test("streams coach progress and final results as NDJSON", async () => {
+  const coachService = {
+    available: true,
+    async respondStream(_payload, onDelta) {
+      onDelta("{");
+      return { coachReply: "Next question?", translation: "下一个问题？", feedback: {} };
+    }
+  };
+  const server = createAppServer(process.cwd(), { coachService });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address();
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/coach/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scenario: { title: "Interview" }, messages: [], answer: "Hello" })
+    });
+    const events = (await response.text()).trim().split("\n").map(line => JSON.parse(line));
+    assert.deepEqual(events.map(event => event.type), ["accepted", "delta", "final"]);
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
