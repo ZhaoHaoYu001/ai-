@@ -25,6 +25,8 @@ $env:ANTHROPIC_MODEL="mimo-v2.5"
 npm.cmd start
 ```
 
+也可使用常见的 `ANTHROPIC_API_KEY` 环境变量替代 `ANTHROPIC_AUTH_TOKEN`。
+
 也可使用 OpenAI Responses API：
 
 ```powershell
@@ -44,6 +46,26 @@ npm.cmd start
 同一组 Azure Speech 配置也会启用服务端语音转写兜底。当浏览器自带
 `SpeechRecognition` 没有返回文字时，项目会在用户结束回答后上传本轮
 16 kHz WAV 录音并自动完成转写。
+
+未配置 Azure Speech 时，服务端会自动使用本地 Whisper Tiny English
+模型转写录音。模型在第一次语音提交时下载到本机缓存，之后可离线使用；
+因此浏览器实时语音识别不可用时，仍可完成语音对话训练。
+默认从 `https://hf-mirror.com/` 下载模型，也可通过 `HF_ENDPOINT` 指定其他
+Hugging Face 兼容模型镜像。
+
+在其他电脑首次运行本地 Whisper：
+
+```powershell
+npm install
+npm.cmd start
+```
+
+打开 `http://localhost:4173`，进入任意场景并完成一轮英语录音。第一次提交
+录音时请保持网络连接并等待模型下载；下载完成后系统会自动继续转写，无需
+手动移动或配置模型文件。可访问 `http://localhost:4173/health`，确认返回
+`"transcription":true` 和 `"transcriptionProvider":"local-whisper"`。
+后续重新启动项目会直接复用本机缓存；如需更换下载镜像，可在启动前设置
+`$env:HF_ENDPOINT="https://your-huggingface-mirror/"`。
 
 详细接口、隐私与降级策略见 `docs/AI_COACH.md` 和 `docs/AZURE_PRONUNCIATION.md`。
 
@@ -179,11 +201,12 @@ npm run test:e2e
 
 ## 第三方依赖与原创说明
 
-- 产品运行时无第三方 JavaScript 库或框架；开发测试使用 `@playwright/test`。
+- 产品运行时使用 `@huggingface/transformers` 提供本地 Whisper 录音转写；开发测试使用 `@playwright/test`。
 - 使用浏览器标准能力：Web Speech API、Speech Synthesis API、LocalStorage。
 - 使用 MediaRecorder 与 Web Audio API 采集真实音频信号并提供本地录音回放；默认不上传音频。
 - 可选使用 Anthropic Messages API 兼容服务（已验证 `mimo-v2.5`）或 OpenAI Responses API 提供上下文角色对话与结构化语言反馈；API Key 仅保存在本地服务端环境变量中。
 - 可选使用 Azure Speech Pronunciation Assessment 提供单词、音素、重音和韵律反馈；密钥仅保存在本地服务端环境变量中。
+- 未配置 Azure Speech 时，本地 Whisper Tiny English 为英语录音提供无需 API Key 的服务端转写兜底。
 - 页面设计、场景数据、对话逻辑、评分逻辑、纠错规则、报告系统及全部代码均为本项目原创实现。
 - 浏览器语音识别的可用性取决于浏览器和网络环境。
 

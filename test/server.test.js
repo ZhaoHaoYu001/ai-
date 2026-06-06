@@ -33,7 +33,13 @@ test("exposes a health endpoint for startup diagnosis", async () => {
   try {
     const response = await fetch(`http://127.0.0.1:${port}/health`);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { status: "ok", app: "FluentLoop", ai: false, aiProvider: null, aiModel: null, pronunciation: false, transcription: false });
+    const health = await response.json();
+    assert.equal(health.status, "ok");
+    assert.equal(health.app, "FluentLoop");
+    assert.equal(health.ai, false);
+    assert.equal(health.pronunciation, false);
+    assert.equal(health.transcription, true);
+    assert.equal(health.transcriptionProvider, "local-whisper");
   } finally {
     server.close();
     await once(server, "close");

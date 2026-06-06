@@ -107,8 +107,8 @@ function anthropicBody(model, payload, stream = false) {
 }
 
 export function createCoachService({
-  provider = process.env.ANTHROPIC_AUTH_TOKEN ? "anthropic" : "openai",
-  apiKey = provider === "anthropic" ? process.env.ANTHROPIC_AUTH_TOKEN : process.env.OPENAI_API_KEY,
+  provider = (process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY) ? "anthropic" : "openai",
+  apiKey = provider === "anthropic" ? (process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY) : process.env.OPENAI_API_KEY,
   baseUrl = provider === "anthropic" ? (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com") : "https://api.openai.com",
   model = provider === "anthropic" ? (process.env.ANTHROPIC_MODEL || "mimo-v2.5") : (process.env.OPENAI_MODEL || "gpt-5.4-mini"),
   request = globalThis.fetch

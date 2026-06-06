@@ -33,6 +33,12 @@ async function mockBrowserVoice(page, microphone = "denied") {
 
 async function mockTurnRecognition(page) {
   await page.addInitScript(() => {
+    window.FLUENTLOOP_AUDIO_CAPTURE_FACTORY = async () => ({
+      beginUtterance() {},
+      snapshot: () => ({ averageLevel: .05, peakLevel: .08, activeRatio: .4 }),
+      utteranceBlob: () => new Blob(["RIFFdemo"], { type: "audio/wav" }),
+      stop: async () => new Blob(["session"], { type: "audio/webm" })
+    });
     window.__speechInstances = [];
     window.__emitFinalSpeech = text => {
       const instance = window.__speechInstances.at(-1);
@@ -96,6 +102,8 @@ test("falls back cleanly when microphone permission is denied", async ({ page })
   await mockBrowserVoice(page);
   await page.goto("/");
   await page.getByText("餐厅点餐", { exact: true }).click();
+  await page.getByRole("button", { name: "继续通话" }).click();
+  await expect(page.getByText(/麦克风无法启动/)).toBeVisible();
   await expect(page.getByRole("button", { name: "继续通话" })).toBeVisible();
   await expect(page.getByPlaceholder("语音不可用时，也可以输入英文回答…")).toBeEnabled();
 });
@@ -105,7 +113,11 @@ test("keeps speech across recognition reconnects and sends one explicit turn", a
   await mockTurnRecognition(page);
   await page.goto("/");
   await page.getByText("求职面试", { exact: true }).click();
-  await expect(page.getByText("正在连接麦克风；文字转写已先行启动", { exact: true })).toBeVisible();
+  await expect(page.getByText(/请点击“继续通话”并允许麦克风权限/)).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__speechInstances.length)).toBe(0);
+  await page.getByRole("button", { name: "继续通话" }).click();
+  await expect(page.getByText("麦克风录音已就绪，可生成发音评测", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__speechInstances.length)).toBe(1);
   const support = page.locator(".answer-support");
   await expect(support.getByText("回答支架 · 通话中也可参考", { exact: true })).toBeVisible();
   await expect(support).toContainText("Could you start by telling me a little about yourself?");
@@ -129,6 +141,7 @@ test("uses the recorded turn when browser recognition returns no text", async ({
   await mockServerTranscriptionFallback(page);
   await page.goto("/");
   await page.getByText("求职面试", { exact: true }).click();
+  await page.getByRole("button", { name: "继续通话" }).click();
   await expect(page.getByText("麦克风录音已就绪，可生成发音评测", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "结束本轮" }).click();
   await expect(page.locator(".msg.user>div>p")).toContainText("I led the launch");
@@ -138,8 +151,9 @@ test("automatically sends a phone turn after the learner stops speaking", async 
   await mockServerTranscriptionFallback(page);
   await page.goto("/");
   await page.getByText("求职面试", { exact: true }).click();
+  await page.getByRole("button", { name: "继续通话" }).click();
   await expect(page.getByRole("button", { name: "结束本轮" })).toBeVisible();
-  await page.getByRole("button", { name: "▶ 播放" }).click();
+  await page.waitForTimeout(350);
   await page.evaluate(() => { window.__voiceSnapshot = { averageLevel: 0, peakLevel: 0, activeRatio: 0 }; });
   await expect(page.locator(".msg.user>div>p")).toContainText("I led the launch", { timeout: 5000 });
 });
@@ -149,8 +163,10 @@ test("keeps recording after the browser recognition service fails", async ({ pag
   await mockTurnRecognition(page);
   await page.goto("/");
   await page.getByText("求职面试", { exact: true }).click();
+  await page.getByRole("button", { name: "继续通话" }).click();
   await expect(page.getByRole("button", { name: "结束本轮" })).toBeVisible();
   await page.evaluate(() => window.__emitSpeechError("service-not-allowed"));
+  await expect(page.getByText(/浏览器实时转写不可用/)).toBeVisible();
   await expect(page.getByRole("button", { name: "结束本轮" })).toBeVisible();
   await page.getByRole("button", { name: "结束本轮" }).click();
   await expect(page.locator(".msg.user>div>p")).toContainText("I led the launch");

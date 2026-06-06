@@ -12,7 +12,13 @@ export default defineConfig({
   },
   webServer: {
     command: "node server.js",
-    env: { PORT: "4174", HOST: "127.0.0.1" },
+    env: {
+      PORT: "4174",
+      HOST: "127.0.0.1",
+      ANTHROPIC_AUTH_TOKEN: "",
+      ANTHROPIC_API_KEY: "",
+      OPENAI_API_KEY: "",
+    },
     url: "http://127.0.0.1:4174/health",
     reuseExistingServer: false,
     timeout: 20_000
