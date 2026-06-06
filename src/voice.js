@@ -47,9 +47,74 @@ function getOpeningEnglish(scenarioId) {
 export function recognitionTranscript(results) {
   let finalText = "";
   let interimText = "";
+  const confidences = [];
   for (const result of results) {
-    if (result.isFinal) finalText += `${result[0].transcript} `;
+    if (result.isFinal) {
+      finalText += `${result[0].transcript} `;
+      if (Number.isFinite(result[0].confidence)) confidences.push(result[0].confidence);
+    }
     else interimText += result[0].transcript;
   }
-  return { finalText: finalText.trim(), interimText: interimText.trim() };
+  return {
+    finalText: finalText.trim(),
+    interimText: interimText.trim(),
+    confidence: confidences.length ? confidences.reduce((sum, value) => sum + value, 0) / confidences.length : 0
+  };
+}
+
+export async function createAudioCapture() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  });
+  const context = new AudioContext();
+  const analyser = context.createAnalyser();
+  analyser.fftSize = 512;
+  context.createMediaStreamSource(stream).connect(analyser);
+  const samples = new Uint8Array(analyser.fftSize);
+  const levels = [];
+  let active = true;
+  let frame;
+
+  const sample = () => {
+    analyser.getByteTimeDomainData(samples);
+    const rms = Math.sqrt(samples.reduce((sum, value) => sum + ((value - 128) / 128) ** 2, 0) / samples.length);
+    levels.push(rms);
+    if (levels.length > 600) levels.shift();
+    if (active) frame = requestAnimationFrame(sample);
+  };
+  sample();
+
+  const chunks = [];
+  let utteranceStart = 0;
+  const recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+  recorder.start(1000);
+
+  return {
+    snapshot() {
+      const recent = levels.slice(-120);
+      return {
+        averageLevel: recent.length ? recent.reduce((sum, level) => sum + level, 0) / recent.length : 0,
+        peakLevel: recent.length ? Math.max(...recent) : 0,
+        activeRatio: recent.length ? recent.filter(level => level > .025).length / recent.length : 0
+      };
+    },
+    utteranceBlob() {
+      const blob = new Blob(chunks.slice(utteranceStart), { type: recorder.mimeType || "audio/webm" });
+      utteranceStart = chunks.length;
+      return blob;
+    },
+    stop() {
+      return new Promise(resolve => {
+        active = false;
+        cancelAnimationFrame(frame);
+        recorder.onstop = () => {
+          stream.getTracks().forEach(track => track.stop());
+          context.close();
+          resolve(new Blob(chunks, { type: recorder.mimeType || "audio/webm" }));
+        };
+        recorder.stop();
+      });
+    }
+  };
 }
