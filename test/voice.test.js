@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appendTurnTranscript, encodePcmWav, recognitionTranscript, translateCoachText } from "../src/voice.js";
+import { appendTurnTranscript, encodePcmWav, recognitionTranscript, requestMicrophoneStream, translateCoachText } from "../src/voice.js";
 
 test("separates final and interim live speech transcripts", () => {
   const result = recognitionTranscript([
@@ -17,6 +17,18 @@ test("keeps finalized speech segments in one explicit learner turn", () => {
     "I led the launch and increased adoption"
   );
   assert.equal(appendTurnTranscript("", "  first segment  "), "first segment");
+});
+
+test("times out a stalled microphone request and closes a late stream", async () => {
+  let resolveStream;
+  let stopped = false;
+  const mediaDevices = {
+    getUserMedia: () => new Promise(resolve => { resolveStream = resolve; })
+  };
+  await assert.rejects(requestMicrophoneStream({ mediaDevices, timeoutMs: 5 }), /timed out/);
+  resolveStream({ getTracks: () => [{ stop: () => { stopped = true; } }] });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(stopped, true);
 });
 
 test("translates scenario opening into Chinese", () => {

@@ -59,6 +59,16 @@ The audio-capture adapter marks the start of each learner turn, so
 pronunciation assessment receives only that turn rather than Coach playback or
 waiting time. Coach text-to-speech is disabled while a learner turn is active.
 
+Speech transcription starts immediately from the learner's click. Microphone
+audio capture is initialized in parallel because a browser permission prompt or
+slow device startup must not block transcript collection. The UI reports
+whether audio capture is connecting, ready, or unavailable.
+
+If a microphone request remains unresolved for eight seconds, FluentLoop
+degrades pronunciation assessment for that turn and closes any media stream
+that arrives after the timeout. Speech transcription and the text-input
+fallback remain available.
+
 When microphone audio capture is unavailable but browser speech recognition
 still works, FluentLoop keeps the transcript flow usable and clearly explains
 that pronunciation evidence is unavailable. Text input remains the final
@@ -66,6 +76,7 @@ fallback.
 
 ## Verification
 
-The Chromium E2E suite simulates a browser recognition service ending during a
-learner answer. It verifies that FluentLoop reconnects, preserves both speech
-segments, and sends exactly one explicit learner turn.
+The Chromium E2E suite simulates a stalled microphone permission request and a
+browser recognition service ending during a learner answer. It verifies that
+transcription starts without waiting for audio capture, reconnects, preserves
+both speech segments, and sends exactly one explicit learner turn.
