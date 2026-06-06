@@ -3,6 +3,9 @@ export function createVoiceActivityGate({
   silenceThreshold = .018,
   speechConfirmMs = 750,
   silenceMs = 2400,
+  confidentSilenceMs = 1800,
+  confidentTranscriptWords = 8,
+  confidentTurnMs = 4000,
   minimumTurnMs = 2500,
   maxTurnMs = 60_000
 } = {}) {
@@ -12,7 +15,7 @@ export function createVoiceActivityGate({
   let silenceStartedAt = null;
 
   return {
-    update({ averageLevel = 0, peakLevel = 0, activeRatio = 0, hasTranscript = false } = {}, now = performance.now()) {
+    update({ averageLevel = 0, peakLevel = 0, activeRatio = 0, hasTranscript = false, transcriptWords = 0 } = {}, now = performance.now()) {
       startedAt ??= now;
       const audioLooksLikeSpeech = peakLevel >= speechThreshold &&
         averageLevel >= silenceThreshold &&
@@ -31,11 +34,16 @@ export function createVoiceActivityGate({
         }
       }
       const turnDuration = now - startedAt;
+      const silenceTargetMs = transcriptWords >= confidentTranscriptWords && turnDuration >= confidentTurnMs ?
+        confidentSilenceMs : silenceMs;
+      const silentForMs = silenceStartedAt === null ? 0 : now - silenceStartedAt;
       return {
         heardSpeech: speechStartedAt !== null,
         confirmingSpeech: speechCandidateAt !== null && speechStartedAt === null,
+        silenceTargetMs,
+        silentForMs,
         shouldFinish: Boolean(
-          (silenceStartedAt && turnDuration >= minimumTurnMs && now - silenceStartedAt >= silenceMs) ||
+          (silenceStartedAt && turnDuration >= minimumTurnMs && silentForMs >= silenceTargetMs) ||
           (speechStartedAt !== null && now - startedAt >= maxTurnMs)
         )
       };

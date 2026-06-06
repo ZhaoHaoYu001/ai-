@@ -35,6 +35,31 @@ test("phone call VAD keeps listening through a short thinking pause", () => {
   assert.equal(gate.update({ peakLevel: 0 }, 3500).shouldFinish, true);
 });
 
+test("phone call VAD shortens silence only after a substantial transcribed answer", () => {
+  const gate = createVoiceActivityGate({
+    speechConfirmMs: 0,
+    silenceMs: 2400,
+    confidentSilenceMs: 1800,
+    confidentTranscriptWords: 8,
+    confidentTurnMs: 4000,
+    minimumTurnMs: 0
+  });
+  gate.update({ hasTranscript: true, transcriptWords: 9 }, 0);
+  gate.update({ hasTranscript: true, transcriptWords: 9 }, 4200);
+  assert.equal(gate.update({ peakLevel: 0, transcriptWords: 9 }, 4300).silenceTargetMs, 1800);
+  assert.equal(gate.update({ peakLevel: 0, transcriptWords: 9 }, 6000).shouldFinish, false);
+  assert.equal(gate.update({ peakLevel: 0, transcriptWords: 9 }, 6200).shouldFinish, true);
+});
+
+test("phone call VAD keeps the safer silence window for short answers", () => {
+  const gate = createVoiceActivityGate({ speechConfirmMs: 0, minimumTurnMs: 0 });
+  gate.update({ hasTranscript: true, transcriptWords: 3 }, 0);
+  gate.update({ peakLevel: 0, transcriptWords: 3 }, 5000);
+  assert.equal(gate.update({ peakLevel: 0, transcriptWords: 3 }, 6800).silenceTargetMs, 2400);
+  assert.equal(gate.update({ peakLevel: 0, transcriptWords: 3 }, 7000).shouldFinish, false);
+  assert.equal(gate.update({ peakLevel: 0, transcriptWords: 3 }, 7500).shouldFinish, true);
+});
+
 test("phone call phases explain the active turn-taking state", () => {
   assert.match(callPhaseCopy("speaking")[0], /AI Coach/);
   assert.match(callPhaseCopy("listening")[1], /自动发送/);

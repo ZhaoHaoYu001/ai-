@@ -19,6 +19,11 @@ turn. The gate never submits silence before the learner has spoken. A manual
 silence detection. **Hang up and view report** ends the call and generates the
 same measurable learning report, recording playback, and next-step guidance.
 
+When the live transcript already contains at least eight words and the learner
+has spoken for more than four seconds, the silence window adapts from roughly
+2.4 seconds to 1.8 seconds. Short answers and turns without a transcript retain
+the safer 2.4-second window.
+
 Grammar, expression, and pronunciation feedback appears only after the learner
 finishes a turn, so coaching remains precise without interrupting speech.
 
