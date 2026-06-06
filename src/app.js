@@ -1,5 +1,5 @@
 import { scenarios } from "./data.js";
-import { summarize } from "./coach.js";
+import { buildSessionInsights, summarize } from "./coach.js";
 import { buildGrowthCalendar } from "./progress.js";
 import { createAudioCapture, recognitionTranscript, translateCoachText } from "./voice.js";
 import { createSpeechAssessmentClient } from "./speech-assessment.js";
@@ -10,7 +10,11 @@ const app = document.querySelector("#app");
 const safe = value => String(value ?? "").replace(/[&<>"']/g, character => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
 })[character]);
-const header = () => `<header><button class="brand" data-home><b>F</b> FluentLoop</button><nav>练习场景　 学习方法　 成长记录</nav><span class="streak">● <b>3</b> 天连续练习</span></header>`;
+const header = () => {
+  const history = JSON.parse(localStorage.getItem("fluentloop-history") || "[]");
+  const streak = buildGrowthCalendar(history).streak;
+  return `<header><button class="brand" data-home><b>F</b> FluentLoop</button><nav>练习场景　 学习方法　 成长记录</nav><span class="streak">● <b>${streak}</b> 天连续练习</span></header>`;
+};
 
 function home() {
   const history = JSON.parse(localStorage.getItem("fluentloop-history") || "[]");
@@ -61,7 +65,8 @@ const message=m=>m.role==="coach"?`<article class="msg coach"><i>FL</i><div><sma
 
 function report() {
   const r=summarize(state.messages), s=state.scenario;
-  app.innerHTML=`${header()}<main class="report"><section class="report-top"><div><label>● SESSION COMPLETE</label><h1>很棒，你完成了<br><em>${s.title}</em>练习。</h1><p>你已经比开始时更敢开口了。下面是本次练习的表现总结。</p></div><div class="ring" style="--score:${r.overall}"><span><b>${r.overall||"--"}</b><small>综合得分</small></span></div></section><section class="metrics">${metric("流利度",r.fluency)}${metric("语法准确度",r.grammar)}${metric("词汇丰富度",r.vocabulary)}${metric("语音清晰度",r.pronunciation)}</section>${state.sessionAudioUrl ? `<section class="audio-review"><label>SESSION AUDIO</label><h2>回听本次口语录音</h2><audio controls src="${state.sessionAudioUrl}"></audio><p>录音仅保存在当前浏览器内存中，刷新页面后自动清除。</p></section>` : ""}<section class="details"><article><label>HIGHLIGHTS</label><h2>本次练习亮点</h2><div class="stats"><span><b>${r.turns}</b>轮对话</span><span><b>${r.words}</b>个单词</span><span><b>${r.wpm}</b>WPM</span><span><b>${r.corrections}</b>个建议</span></div><p class="note"><b>Coach 建议</b>浏览器清晰度分只反映识别置信度和音频信号质量，不代表音素、重音或语调准确度。接入专业评测服务后可展示单词和音素级诊断。</p></article><aside><label>NEXT STEP</label><h2>把建议变成能力</h2><p>建议回听录音，重点关注停顿、语速和表达清晰度。</p><button data-retry>再练一次 →</button><button data-home>选择其他场景</button></aside></section></main>${pageFooter()}`;
+  const history=JSON.parse(localStorage.getItem("fluentloop-history")||"[]"),insights=buildSessionInsights(state.messages,s,history.slice(1));
+  app.innerHTML=`${header()}<main class="report"><section class="report-top"><div><label>● SESSION COMPLETE</label><h1>很棒，你完成了<br><em>${s.title}</em>练习。</h1><p>${safe(insights.trend)}</p></div><div class="ring" style="--score:${r.overall}"><span><b>${r.overall||"--"}</b><small>综合得分</small></span></div></section><section class="metrics">${metric("流利度",r.fluency)}${metric("语法准确度",r.grammar)}${metric("词汇丰富度",r.vocabulary)}${metric("语音清晰度",r.pronunciation)}</section>${state.sessionAudioUrl ? `<section class="audio-review"><label>SESSION AUDIO</label><h2>回听本次口语录音</h2><audio controls src="${state.sessionAudioUrl}"></audio><p>录音仅保存在当前浏览器内存中，刷新页面后自动清除。</p></section>` : ""}<section class="details"><article><label>PERSONAL INSIGHTS</label><h2>本次练习洞察</h2><div class="stats"><span><b>${r.turns}</b>轮对话</span><span><b>${r.words}</b>个单词</span><span><b>${r.wpm}</b>WPM</span><span><b>${r.corrections}</b>个建议</span></div><p class="note"><b>优势</b>${safe(insights.strength)}</p><p class="note"><b>重点</b>${safe(insights.focus)}</p><p class="note"><b>复练</b>${safe(insights.correction)}</p></article><aside><label>NEXT STEP</label><h2>把建议变成能力</h2><p>${safe(insights.nextTask)}</p><button data-retry>再练一次 →</button><button data-home>选择其他场景</button></aside></section></main>${pageFooter()}`;
   document.querySelector("[data-retry]").onclick=()=>start(s.id); bindHome();
 }
 const metric=(name,score)=>`<article><span><small>${name}</small><b>${Number.isFinite(score)?score:"N/A"}</b></span><i><b style="width:${Number.isFinite(score)?score:0}%"></b></i><p>${Number.isFinite(score)?"保持练习，下一次表达会更自然。":"仅语音回答可获得此项评测。"}</p></article>`;

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyze, applyAiFeedback, reply, summarize } from "../src/coach.js";
+import { analyze, applyAiFeedback, buildSessionInsights, reply, summarize } from "../src/coach.js";
 import { scenarios } from "../src/data.js";
 
 test("detects grammar and expression issues", () => {
@@ -72,4 +72,18 @@ test("session summary aggregates measurable learning metrics", () => {
   assert.equal(summary.words, analysis.words);
   assert.equal(summary.overall, analysis.scores.overall);
   assert.equal(summary.pronunciation, null);
+});
+
+test("builds personalized session insights from scores, corrections, and history", () => {
+  const analysis = analyze("I have three years experience and I very like product design.", 8);
+  const insights = buildSessionInsights(
+    [{ role: "user", text: "answer", analysis }],
+    scenarios[0],
+    [{ overall: analysis.scores.overall - 5 }]
+  );
+  assert.match(insights.strength, /分/);
+  assert.match(insights.focus, /下一步重点/);
+  assert.match(insights.correction, /优先复练/);
+  assert.match(insights.nextTask, /求职面试/);
+  assert.match(insights.trend, /提高 5 分/);
 });

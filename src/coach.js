@@ -77,3 +77,37 @@ export function summarize(messages) {
     wpm: analyses.length ? Math.round(analyses.reduce((s, a) => s + a.wpm, 0) / analyses.length) : 0
   };
 }
+
+export function buildSessionInsights(messages, scenario, history = []) {
+  const summary = summarize(messages);
+  const labels = { fluency: "流利度", grammar: "语法准确度", vocabulary: "词汇丰富度", pronunciation: "语音清晰度" };
+  const dimensions = Object.keys(labels)
+    .map(key => ({ key, label: labels[key], score: summary[key] }))
+    .filter(item => Number.isFinite(item.score))
+    .sort((a, b) => b.score - a.score);
+  const corrections = messages
+    .filter(message => message.role === "user")
+    .flatMap(message => message.analysis.corrections || []);
+  const correctionCounts = new Map();
+  for (const correction of corrections) {
+    const key = correction.improved || correction.reason;
+    correctionCounts.set(key, (correctionCounts.get(key) || 0) + 1);
+  }
+  const frequentCorrection = [...correctionCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const previousScores = history.map(item => Number(item.overall)).filter(Number.isFinite).slice(0, 5);
+  const previousAverage = previousScores.length ?
+    Math.round(previousScores.reduce((sum, score) => sum + score, 0) / previousScores.length) : null;
+  const trend = Number.isFinite(summary.overall) && Number.isFinite(previousAverage) ?
+    summary.overall - previousAverage : null;
+
+  return {
+    strength: dimensions[0] ? `${dimensions[0].label}是本次优势（${dimensions[0].score} 分）。` : "完成更多回答后可识别优势能力。",
+    focus: dimensions.at(-1) ? `${dimensions.at(-1).label}是下一步重点（${dimensions.at(-1).score} 分）。` : "完成语音回答后可生成重点建议。",
+    correction: frequentCorrection ? `优先复练：${frequentCorrection[0]}${frequentCorrection[1] > 1 ? `（出现 ${frequentCorrection[1]} 次）` : ""}。` : "本次没有发现需要优先复练的表达错误。",
+    nextTask: `下一次继续练习“${scenario.title}”，目标是：${scenario.goal}。`,
+    trend: trend === null ? "完成更多练习后将显示历史趋势。" :
+      trend > 0 ? `综合分比最近练习平均提高 ${trend} 分。` :
+      trend < 0 ? `综合分比最近练习平均低 ${Math.abs(trend)} 分，建议针对重点能力复练。` :
+      "综合分与最近练习平均持平。"
+  };
+}
