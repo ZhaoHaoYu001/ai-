@@ -7,12 +7,14 @@ continuous AI phone call:
 
 1. Entering a scene connects the call and plays the Coach opening.
 2. When Coach playback ends, FluentLoop automatically starts the learner turn.
-3. A local voice-activity gate waits until speech is detected, then treats
-   roughly 1.4 seconds of silence as the end of the answer.
+3. A local voice-activity gate requires roughly 750 ms of sustained speech or
+   a live transcript, keeps the turn open for at least 2.5 seconds, then treats
+   roughly 2.4 seconds of silence as the end of the answer.
 4. The completed turn is transcribed, assessed, corrected, and sent to the AI.
 5. The AI response is played and the next learner turn starts automatically.
 
-The gate never submits silence before the learner has spoken. A manual
+Short noise bursts and brief thinking pauses do not immediately submit the
+turn. The gate never submits silence before the learner has spoken. A manual
 **Finish turn** control remains available when background noise prevents clean
 silence detection. **Hang up and view report** ends the call and generates the
 same measurable learning report, recording playback, and next-step guidance.
