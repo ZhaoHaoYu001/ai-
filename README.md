@@ -56,11 +56,14 @@ Hugging Face 兼容模型镜像。
 在其他电脑首次运行本地 Whisper：
 
 ```powershell
+git clone git@github.com:ZhaoHaoYu001/ai-.git fluentloop
+cd fluentloop
 npm install
 npm.cmd start
 ```
 
-打开 `http://localhost:4173`，进入任意场景并完成一轮英语录音。第一次提交
+必须在包含 `package.json` 的项目目录中运行 `npm install`。打开
+`http://localhost:4173`，进入任意场景并完成一轮英语录音。第一次提交
 录音时请保持网络连接并等待模型下载；下载完成后系统会自动继续转写，无需
 手动移动或配置模型文件。可访问 `http://localhost:4173/health`，确认返回
 `"transcription":true` 和 `"transcriptionProvider":"local-whisper"`。
