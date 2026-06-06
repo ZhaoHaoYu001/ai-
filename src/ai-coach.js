@@ -60,7 +60,7 @@ export function createAiCoachClient({
           mode: "ai",
           provider: result.provider || "ai",
           model: result.model || null,
-          analysis: applyAiFeedback(localAnalysis, result.feedback),
+          analysis: applyAiFeedback(localAnalysis, result.feedback, text),
           latency: { firstByteMs, aiMs: Math.round(performance.now() - startedAt), transport: response.body?.getReader ? "stream" : "json" },
           coach: {
             text: result.coachReply,

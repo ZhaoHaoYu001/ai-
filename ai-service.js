@@ -25,7 +25,7 @@ const responseSchema = {
         vocabularyScore: { type: "integer", minimum: 0, maximum: 100 },
         corrections: {
           type: "array",
-          maxItems: 3,
+          maxItems: 2,
           items: {
             type: "object",
             additionalProperties: false,
@@ -64,6 +64,8 @@ Create support for answering coachReply: exactly 3 concise English sentence star
 The support must respond directly to coachReply and reflect the latest conversation context. Do not repeat generic scenario-level support.
 Assess grammar and vocabulary in context, not with keyword matching.
 Only include corrections that materially improve the answer.
+Each correction.original must be an exact substring of the learner's latest answer.
+Return at most two non-duplicated corrections. Do not correct preferences, names, or already-natural phrasing.
 Correction reasons must be concise Chinese explanations.
 Encouragement must be one short Chinese sentence and specific to this answer.`;
 }

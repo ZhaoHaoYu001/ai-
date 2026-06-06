@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyze, applyAiFeedback, buildSessionInsights, reply, summarize } from "../src/coach.js";
+import { analyze, applyAiFeedback, buildSessionInsights, reply, selectMaterialCorrections, summarize } from "../src/coach.js";
 import { scenarios } from "../src/data.js";
 
 test("detects grammar and expression issues", () => {
@@ -47,21 +47,43 @@ test("coach follows up based on the selected scenario", () => {
 
 test("merges contextual AI feedback with measurable local speech metrics", () => {
   const local = analyze("I led a launch last year.", 6, { clarity: 78 });
+  const answer = "I led a launch last year.";
   const result = applyAiFeedback(local, {
     encouragement: "成果表达清楚。",
     grammarScore: 95,
     vocabularyScore: 89,
     corrections: [{ original: "led a launch", improved: "led a successful launch", reason: "表达更具体。" }]
-  });
+  }, answer);
   assert.equal(result.scores.pronunciation, 78);
   assert.equal(result.scores.grammar, 95);
   assert.equal(result.corrections.length, 1);
   assert.equal(result.assessmentMode, "ai");
 });
 
+test("filters hallucinated, duplicate, and no-op AI corrections", () => {
+  const fallback = [{ original: "years experience", improved: "years of experience", reason: "需要 of" }];
+  const result = selectMaterialCorrections("I have three years experience.", [
+    { original: "I worked at Google", improved: "I work at Google", reason: "不存在于回答" },
+    { original: "years experience", improved: "years of experience", reason: "需要 of" },
+    { original: "years experience", improved: "years of experience", reason: "重复" },
+    { original: "three", improved: "three", reason: "没有变化" }
+  ], fallback);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].original, "years experience");
+  assert.equal(result[0].timing, "after-turn");
+});
+
+test("falls back to deterministic corrections when AI suggestions are unreliable", () => {
+  const fallback = [{ original: "very like", improved: "really like", reason: "副词搭配" }];
+  const result = selectMaterialCorrections("I very like design.", [
+    { original: "missing phrase", improved: "better phrase", reason: "幻觉建议" }
+  ], fallback);
+  assert.equal(result[0].original, "very like");
+});
+
 test("keeps the short-answer ceiling after AI feedback", () => {
   const local = analyze("Yes.", 2);
-  const result = applyAiFeedback(local, { grammarScore: 100, vocabularyScore: 100, corrections: [] });
+  const result = applyAiFeedback(local, { grammarScore: 100, vocabularyScore: 100, corrections: [] }, "Yes.");
   assert.ok(result.scores.overall <= 45);
 });
 
