@@ -1,10 +1,20 @@
 const responseSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["coachReply", "translation", "feedback"],
+  required: ["coachReply", "translation", "support", "feedback"],
   properties: {
     coachReply: { type: "string" },
     translation: { type: "string" },
+    support: {
+      type: "object",
+      additionalProperties: false,
+      required: ["starters", "keywords", "example"],
+      properties: {
+        starters: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" } },
+        keywords: { type: "array", minItems: 4, maxItems: 4, items: { type: "string" } },
+        example: { type: "string" }
+      }
+    },
     feedback: {
       type: "object",
       additionalProperties: false,
@@ -50,6 +60,8 @@ Learner's latest answer: ${answer}
 Continue the role-play naturally. Ask one concise, context-aware follow-up question.
 Do not repeat a question already asked. Keep coachReply under 45 words.
 Give a natural Chinese translation of coachReply.
+Create support for answering coachReply: exactly 3 concise English sentence starters, exactly 4 useful keywords or phrases, and one natural English example answer under 35 words.
+The support must respond directly to coachReply and reflect the latest conversation context. Do not repeat generic scenario-level support.
 Assess grammar and vocabulary in context, not with keyword matching.
 Only include corrections that materially improve the answer.
 Correction reasons must be concise Chinese explanations.
@@ -76,11 +88,12 @@ function parseStructuredText(text) {
   }
 }
 
-function responseBody(model, payload, stream = false) {
+function responseBody(model, payload, stream = false, maxTokens = 800) {
   return {
     model,
     input: buildPrompt(payload),
     stream,
+    max_output_tokens: maxTokens,
     text: {
       format: {
         type: "json_schema",
@@ -96,21 +109,26 @@ function anthropicEndpoint(baseUrl) {
   return `${String(baseUrl).replace(/\/+$/, "")}/v1/messages`;
 }
 
-function anthropicBody(model, payload, stream = false) {
-  return {
+function anthropicBody(model, payload, stream = false, maxTokens = 800) {
+  const body = {
     model,
-    max_tokens: 2400,
+    max_tokens: maxTokens,
     stream,
     system: `Return only compact valid JSON matching this JSON Schema. Do not include markdown, comments, or analysis:\n${JSON.stringify(responseSchema)}`,
     messages: [{ role: "user", content: buildPrompt(payload) }]
   };
+  if (/^glm-/i.test(model)) {
+    body.thinking = { type: process.env.AI_THINKING || "disabled" };
+  }
+  return body;
 }
 
 export function createCoachService({
-  provider = process.env.ANTHROPIC_AUTH_TOKEN ? "anthropic" : "openai",
-  apiKey = provider === "anthropic" ? process.env.ANTHROPIC_AUTH_TOKEN : process.env.OPENAI_API_KEY,
+  provider = (process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY) ? "anthropic" : "openai",
+  apiKey = provider === "anthropic" ? (process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY) : process.env.OPENAI_API_KEY,
   baseUrl = provider === "anthropic" ? (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com") : "https://api.openai.com",
   model = provider === "anthropic" ? (process.env.ANTHROPIC_MODEL || "mimo-v2.5") : (process.env.OPENAI_MODEL || "gpt-5.4-mini"),
+  maxTokens = Number(process.env.AI_MAX_TOKENS) || 800,
   request = globalThis.fetch
 } = {}) {
   const headers = provider === "anthropic" ? {
@@ -132,7 +150,7 @@ export function createCoachService({
       const response = await request(provider === "anthropic" ? anthropicEndpoint(baseUrl) : `${baseUrl}/v1/responses`, {
         method: "POST",
         headers,
-        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload) : responseBody(model, payload))
+        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload, false, maxTokens) : responseBody(model, payload, false, maxTokens))
       });
 
       if (!response.ok) {
@@ -149,7 +167,7 @@ export function createCoachService({
       const response = await request(provider === "anthropic" ? anthropicEndpoint(baseUrl) : `${baseUrl}/v1/responses`, {
         method: "POST",
         headers,
-        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload, true) : responseBody(model, payload, true))
+        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload, true, maxTokens) : responseBody(model, payload, true, maxTokens))
       });
       if (!response.ok || !response.body) throw new Error(`${provider} streaming request failed (${response.status})`);
 
@@ -158,10 +176,12 @@ export function createCoachService({
       let output = "";
       for await (const chunk of response.body) {
         pending += decoder.decode(chunk, { stream: true });
+        pending = pending.replace(/\r\n/g, "\n");
         const events = pending.split("\n\n");
         pending = events.pop() || "";
         for (const event of events) {
-          const data = event.split("\n").find(line => line.startsWith("data: "))?.slice(6);
+          const dataLine = event.split("\n").find(line => line.startsWith("data:"));
+          const data = dataLine?.replace(/^data:\s?/, "");
           if (!data || data === "[DONE]") continue;
           const parsed = JSON.parse(data);
           const delta = provider === "anthropic" && parsed.type === "content_block_delta" ? parsed.delta?.text :

@@ -25,6 +25,11 @@ $env:ANTHROPIC_MODEL="mimo-v2.5"
 npm.cmd start
 ```
 
+也可使用常见的 `ANTHROPIC_API_KEY` 环境变量替代 `ANTHROPIC_AUTH_TOKEN`。
+为保证口语通话响应速度，GLM 模型默认关闭深度思考，并将单轮 AI 输出限制为
+800 tokens。可通过 `AI_THINKING=enabled` 重新开启思考，或通过
+`AI_MAX_TOKENS` 调整输出上限；开启深度思考会显著增加通话等待时间。
+
 也可使用 OpenAI Responses API：
 
 ```powershell
@@ -45,6 +50,32 @@ npm.cmd start
 `SpeechRecognition` 没有返回文字时，项目会在用户结束回答后上传本轮
 16 kHz WAV 录音并自动完成转写。
 
+未配置 Azure Speech 时，服务端会自动使用本地 Whisper Tiny English
+模型转写录音。模型在第一次语音提交时下载到本机缓存，之后可离线使用；
+因此浏览器实时语音识别不可用时，仍可完成语音对话训练。
+默认从 `https://hf-mirror.com/` 下载模型，也可通过 `HF_ENDPOINT` 指定其他
+Hugging Face 兼容模型镜像。
+
+在其他电脑首次运行本地 Whisper：
+
+```powershell
+git clone git@github.com:ZhaoHaoYu001/ai-.git fluentloop
+cd fluentloop
+npm install
+npm.cmd start
+```
+
+必须在包含 `package.json` 的项目目录中运行 `npm install`。打开
+`http://localhost:4173`，进入任意场景并完成一轮英语录音。第一次提交
+录音时请保持网络连接并等待模型下载；下载完成后系统会自动继续转写，无需
+手动移动或配置模型文件。可访问 `http://localhost:4173/health`，确认返回
+`"transcription":true` 和 `"transcriptionProvider":"local-whisper"`。
+后续重新启动项目会直接复用本机缓存；如需更换下载镜像，可在启动前设置
+`$env:HF_ENDPOINT="https://your-huggingface-mirror/"`。
+
+服务启动后会在后台预热本地 Whisper，建议看到启动日志后再打开练习页面。
+短录音使用无分块快速推理，超过 20 秒的录音才会自动分块处理。
+
 详细接口、隐私与降级策略见 `docs/AI_COACH.md` 和 `docs/AZURE_PRONUNCIATION.md`。
 
 打开 `http://localhost:4173`。推荐使用最新版 Chrome 或 Edge，以体验实时英语语音识别和语音合成。
@@ -55,8 +86,10 @@ npm.cmd start
 - **自然追问**：AI Coach 根据回答长度、礼貌表达和因果表达动态回应，而不是固定脚本播放。
 - **语境化 AI 对话与纠错**：配置服务端模型后，Coach 会读取最近对话和场景目标，生成不重复的角色追问，并返回结构化语法、词汇与表达建议。
 - **稳定半双工语音引擎**：AI 与练习者交替说话，避免扬声器回声污染录音；浏览器识别服务重连不会拆散回答，服务不可用时自动使用本轮 WAV 录音转写。
+- **抗杂音自动提交**：只有持续有效人声或实时转写会启动回答结束检测；短杂音、碰麦声和短思考停顿不会立即提交，确认静音约 2.4 秒后才进入下一轮。
 - **AI 语音电话模式**：进入场景后自动接通，AI 说完即自动聆听；本地 VAD 在确认用户开口后检测约 1.4 秒停顿并提交回答，AI 回复后继续下一轮。用户仍可手动结束本轮、文字降级或挂断生成报告。
 - **录音中回答支架**：每个场景持续展示当前问题、正确句型开头、关键词和自然示例，避免练习者因没有参考而冷场，同时不覆盖或自动提交正在录制的回答。
+- **上下文实时回答建议**：AI 每轮生成追问时同步生成针对当前问题的句型开头、关键词和自然示例；不额外发起请求。AI 不可用时，离线规则也会根据问题意图切换建议。
 - **非阻塞语音启动**：点击开始后立即进入文字转写，麦克风录音与发音评测链路并行初始化；权限弹窗或设备启动缓慢不会再阻塞回答录入。
 - **流式 AI 与延迟观测**：AI 模式转发模型增量事件，并展示首字节、AI、发音评测和本轮总延迟。
 - **适时纠错**：不在用户说话中途打断，回答结束后集中展示语法和表达建议。
@@ -179,11 +212,12 @@ npm run test:e2e
 
 ## 第三方依赖与原创说明
 
-- 产品运行时无第三方 JavaScript 库或框架；开发测试使用 `@playwright/test`。
+- 产品运行时使用 `@huggingface/transformers` 提供本地 Whisper 录音转写；开发测试使用 `@playwright/test`。
 - 使用浏览器标准能力：Web Speech API、Speech Synthesis API、LocalStorage。
 - 使用 MediaRecorder 与 Web Audio API 采集真实音频信号并提供本地录音回放；默认不上传音频。
 - 可选使用 Anthropic Messages API 兼容服务（已验证 `mimo-v2.5`）或 OpenAI Responses API 提供上下文角色对话与结构化语言反馈；API Key 仅保存在本地服务端环境变量中。
 - 可选使用 Azure Speech Pronunciation Assessment 提供单词、音素、重音和韵律反馈；密钥仅保存在本地服务端环境变量中。
+- 未配置 Azure Speech 时，本地 Whisper Tiny English 为英语录音提供无需 API Key 的服务端转写兜底。
 - 页面设计、场景数据、对话逻辑、评分逻辑、纠错规则、报告系统及全部代码均为本项目原创实现。
 - 浏览器语音识别的可用性取决于浏览器和网络环境。
 

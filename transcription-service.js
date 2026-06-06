@@ -36,3 +36,10 @@ export function createAzureTranscriptionService({
     }
   };
 }
+
+export async function createTranscriptionService(options = {}) {
+  const azure = createAzureTranscriptionService(options.azure);
+  if (azure.available) return azure;
+  const { createLocalWhisperService } = await import("./local-whisper-service.js");
+  return createLocalWhisperService(options.local);
+}

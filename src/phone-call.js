@@ -1,28 +1,42 @@
 export function createVoiceActivityGate({
-  speechThreshold = .035,
+  speechThreshold = .04,
   silenceThreshold = .018,
-  silenceMs = 1400,
-  maxTurnMs = 45_000
+  speechConfirmMs = 750,
+  silenceMs = 2400,
+  minimumTurnMs = 2500,
+  maxTurnMs = 60_000
 } = {}) {
   let startedAt = null;
   let speechStartedAt = null;
+  let speechCandidateAt = null;
   let silenceStartedAt = null;
 
   return {
-    update({ peakLevel = 0, activeRatio = 0, hasTranscript = false } = {}, now = performance.now()) {
+    update({ averageLevel = 0, peakLevel = 0, activeRatio = 0, hasTranscript = false } = {}, now = performance.now()) {
       startedAt ??= now;
-      const speaking = hasTranscript || peakLevel >= speechThreshold || activeRatio >= .16;
+      const audioLooksLikeSpeech = peakLevel >= speechThreshold &&
+        averageLevel >= silenceThreshold &&
+        activeRatio >= .18;
+      const speaking = hasTranscript || audioLooksLikeSpeech;
       if (speaking) {
-        speechStartedAt ??= now;
+        speechCandidateAt ??= now;
+        if (hasTranscript || now - speechCandidateAt >= speechConfirmMs) {
+          speechStartedAt ??= speechCandidateAt;
+        }
         silenceStartedAt = null;
-      } else if (speechStartedAt && peakLevel <= silenceThreshold && activeRatio <= .08) {
-        silenceStartedAt ??= now;
+      } else {
+        if (speechStartedAt === null) speechCandidateAt = null;
+        if (speechStartedAt !== null && peakLevel <= silenceThreshold && activeRatio <= .08) {
+          silenceStartedAt ??= now;
+        }
       }
+      const turnDuration = now - startedAt;
       return {
-        heardSpeech: Boolean(speechStartedAt),
+        heardSpeech: speechStartedAt !== null,
+        confirmingSpeech: speechCandidateAt !== null && speechStartedAt === null,
         shouldFinish: Boolean(
-          (silenceStartedAt && now - silenceStartedAt >= silenceMs) ||
-          (speechStartedAt && now - startedAt >= maxTurnMs)
+          (silenceStartedAt && turnDuration >= minimumTurnMs && now - silenceStartedAt >= silenceMs) ||
+          (speechStartedAt !== null && now - startedAt >= maxTurnMs)
         )
       };
     }

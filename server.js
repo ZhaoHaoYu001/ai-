@@ -4,7 +4,7 @@ import { extname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCoachService } from "./ai-service.js";
 import { createAzurePronunciationService } from "./pronunciation-service.js";
-import { createAzureTranscriptionService } from "./transcription-service.js";
+import { createTranscriptionService } from "./transcription-service.js";
 
 const types = {
   ".css": "text/css; charset=utf-8",
@@ -84,12 +84,15 @@ function validateCoachPayload(payload) {
 export function createAppServer(root = process.cwd(), {
   coachService = createCoachService(),
   pronunciationService = createAzurePronunciationService(),
-  transcriptionService = createAzureTranscriptionService()
+  transcriptionService
 } = {}) {
+  const transcriptionServicePromise = transcriptionService ?
+    Promise.resolve(transcriptionService) : createTranscriptionService();
   const rootPath = resolve(root);
   return createServer(async (request, response) => {
     if (request.url === "/health") {
-      json(response, 200, { status: "ok", app: "FluentLoop", ai: coachService.available, aiProvider: coachService.available ? coachService.provider : null, aiModel: coachService.available ? coachService.model : null, pronunciation: pronunciationService.available, transcription: transcriptionService.available });
+      const activeTranscription = await transcriptionServicePromise;
+      json(response, 200, { status: "ok", app: "FluentLoop", ai: coachService.available, aiProvider: coachService.available ? coachService.provider : null, aiModel: coachService.available ? coachService.model : null, pronunciation: pronunciationService.available, transcription: activeTranscription.available, transcriptionProvider: activeTranscription.provider });
       return;
     }
 
@@ -147,9 +150,11 @@ export function createAppServer(root = process.cwd(), {
     if (request.url === "/api/transcribe" && request.method === "POST") {
       try {
         if (!request.headers["content-type"]?.startsWith("audio/wav")) throw requestError(415, "Content-Type must be audio/wav");
-        json(response, 200, await transcriptionService.transcribe(await readBody(request)));
+        const activeTranscription = await transcriptionServicePromise;
+        json(response, 200, await activeTranscription.transcribe(await readBody(request)));
       } catch (error) {
-        const status = error.status || (transcriptionService.available ? 502 : 503);
+        const activeTranscription = await transcriptionServicePromise;
+        const status = error.status || (activeTranscription.available ? 502 : 503);
         json(response, status, { error: error.status ? error.message : "Speech transcription is temporarily unavailable" });
       }
       return;
@@ -186,8 +191,11 @@ export function startServer({
 } = {}) {
   const coachService = createCoachService();
   const pronunciationService = createAzurePronunciationService();
-  const transcriptionService = createAzureTranscriptionService();
-  const server = createAppServer(root, { coachService, pronunciationService, transcriptionService });
+  const transcriptionServicePromise = createTranscriptionService();
+  const transcriptionWarmupPromise = transcriptionServicePromise
+    .then(service => service.warmup?.())
+    .catch(error => console.warn(`Transcription warmup skipped: ${error.message}`));
+  const server = createAppServer(root, { coachService, pronunciationService, transcriptionService: transcriptionServicePromise });
 
   server.on("error", error => {
     if (error.code === "EADDRINUSE") {
@@ -198,12 +206,17 @@ export function startServer({
     process.exitCode = 1;
   });
 
-  server.listen(port, host, () => {
+  server.listen(port, host, async () => {
+    const transcriptionService = await transcriptionServicePromise;
     console.log(`FluentLoop is running at http://${host}:${port}`);
     console.log(`Health check: http://${host}:${port}/health`);
     console.log(`AI Coach: ${coachService.available ? `${coachService.provider} / ${coachService.model}` : "offline fallback (set ANTHROPIC_AUTH_TOKEN or OPENAI_API_KEY to enable)"}`);
     console.log(`Pronunciation: ${pronunciationService.available ? "Azure Speech enabled" : "browser proxy (set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable)"}`);
-    console.log(`Transcription fallback: ${transcriptionService.available ? "Azure Speech enabled" : "unavailable (set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable)"}`);
+    console.log(`Transcription fallback: ${transcriptionService.provider}${transcriptionService.model ? ` / ${transcriptionService.model}` : ""}`);
+    if (transcriptionService.warmup) {
+      console.log("Local Whisper is warming up in the background for a faster first response.");
+      void transcriptionWarmupPromise;
+    }
     console.log("Keep this window open while using the app. Press Ctrl+C to stop.");
   });
 

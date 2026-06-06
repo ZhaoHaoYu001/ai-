@@ -16,6 +16,8 @@ $env:ANTHROPIC_MODEL="mimo-v2.5"
 npm.cmd start
 ```
 
+`ANTHROPIC_API_KEY` is also accepted as an alias for `ANTHROPIC_AUTH_TOKEN`.
+
 The adapter calls `${ANTHROPIC_BASE_URL}/v1/messages`, supports normal and
 streaming responses, and sends both `Authorization: Bearer` and `x-api-key`
 headers for compatibility with official and proxied Messages API endpoints.

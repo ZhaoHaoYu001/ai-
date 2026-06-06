@@ -11,6 +11,7 @@ const payload = {
 test("AI coach sends context and returns structured feedback", async () => {
   let requestBody;
   const service = createCoachService({
+    provider: "openai",
     apiKey: "test-key",
     model: "test-model",
     request: async (_url, options) => {
@@ -38,7 +39,10 @@ test("AI coach sends context and returns structured feedback", async () => {
   const result = await service.respond(payload);
   assert.equal(result.feedback.grammarScore, 94);
   assert.equal(requestBody.model, "test-model");
+  assert.equal(requestBody.max_output_tokens, 800);
   assert.equal(requestBody.text.format.type, "json_schema");
+  assert.ok(requestBody.text.format.schema.required.includes("support"));
+  assert.match(requestBody.input, /support must respond directly/i);
   assert.match(requestBody.input, /product launch/);
   assert.match(requestBody.input, /Tell me about yourself/);
 });
@@ -109,8 +113,40 @@ test("Anthropic-compatible coach sends Messages API requests and parses structur
   assert.equal(requestHeaders.Authorization, "Bearer test-anthropic-key");
   assert.equal(requestHeaders["x-api-key"], "test-anthropic-key");
   assert.equal(requestBody.model, "mimo-v2.5");
+  assert.equal(requestBody.max_tokens, 800);
+  assert.equal(requestBody.thinking, undefined);
   assert.match(requestBody.messages[0].content, /product launch/);
   assert.equal(result.feedback.grammarScore, 93);
+});
+
+test("GLM coach disables deep thinking for low-latency speaking practice", async () => {
+  let requestBody;
+  const service = createCoachService({
+    provider: "anthropic",
+    apiKey: "test-key",
+    model: "glm-5.1",
+    request: async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return {
+        ok: true,
+        async json() {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                coachReply: "What happened next?",
+                translation: "接下来发生了什么？",
+                feedback: { encouragement: "表达清楚。", grammarScore: 90, vocabularyScore: 88, corrections: [] }
+              })
+            }]
+          };
+        }
+      };
+    }
+  });
+
+  await service.respond(payload);
+  assert.deepEqual(requestBody.thinking, { type: "disabled" });
 });
 
 test("Anthropic-compatible coach consumes Messages API stream deltas", async () => {
@@ -138,6 +174,34 @@ test("Anthropic-compatible coach consumes Messages API stream deltas", async () 
   const result = await service.respondStream(payload, delta => deltas.push(delta));
   assert.equal(result.feedback.grammarScore, 95);
   assert.deepEqual(deltas, parts);
+});
+
+test("Anthropic-compatible coach accepts CRLF-delimited SSE streams", async () => {
+  const resultText = JSON.stringify({
+    coachReply: "What measurable impact did it have?",
+    translation: "它产生了哪些可量化影响？",
+    support: {
+      starters: ["The result was...", "We measured...", "This led to..."],
+      keywords: ["result", "impact", "increase", "adoption"],
+      example: "The result was a 20% increase in adoption."
+    },
+    feedback: { encouragement: "成果清晰。", grammarScore: 94, vocabularyScore: 91, corrections: [] }
+  });
+  const service = createCoachService({
+    provider: "anthropic",
+    apiKey: "test-key",
+    request: async () => ({
+      ok: true,
+      body: {
+        async *[Symbol.asyncIterator]() {
+          yield new TextEncoder().encode(`event: content_block_delta\r\ndata:${JSON.stringify({ type: "content_block_delta", delta: { type: "text_delta", text: resultText } })}\r\n\r\n`);
+        }
+      }
+    })
+  });
+
+  const result = await service.respondStream(payload);
+  assert.equal(result.support.keywords[1], "impact");
 });
 
 test("Anthropic-compatible coach tolerates trailing commas in structured model output", async () => {
