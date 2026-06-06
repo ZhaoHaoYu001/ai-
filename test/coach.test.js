@@ -16,6 +16,20 @@ test("returns strong scores for a clear natural response", () => {
   assert.ok(result.scores.overall >= 80);
   assert.ok(result.wpm > 80);
   assert.equal(result.scores.pronunciation, null);
+  assert.equal(result.scoringEvidence.confidence, "medium");
+});
+
+test("does not award a high overall score to an extremely short answer", () => {
+  const result = analyze("Yes.", 2);
+  assert.ok(result.scores.overall <= 45);
+  assert.equal(result.scoringEvidence.confidence, "low");
+  assert.equal(result.scoringEvidence.metrics.durationSeconds, 2);
+});
+
+test("allows weak evidence to produce scores below the old artificial floor", () => {
+  const result = analyze("Um.", 8, { clarity: 18, level: "clarity-proxy" });
+  assert.ok(result.scores.fluency < 55);
+  assert.equal(result.scores.pronunciation, 18);
 });
 
 test("uses real speech evidence when calculating clarity score", () => {
@@ -43,6 +57,12 @@ test("merges contextual AI feedback with measurable local speech metrics", () =>
   assert.equal(result.scores.grammar, 95);
   assert.equal(result.corrections.length, 1);
   assert.equal(result.assessmentMode, "ai");
+});
+
+test("keeps the short-answer ceiling after AI feedback", () => {
+  const local = analyze("Yes.", 2);
+  const result = applyAiFeedback(local, { grammarScore: 100, vocabularyScore: 100, corrections: [] });
+  assert.ok(result.scores.overall <= 45);
 });
 
 test("session summary aggregates measurable learning metrics", () => {
