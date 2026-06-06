@@ -122,7 +122,10 @@ flowchart LR
 
 ```bash
 npm run check
+npm run test:e2e
 ```
+
+`npm run test:e2e` 使用真实 Chromium 自动验证完整文字训练流程、麦克风权限拒绝降级和移动端核心布局。
 
 手动验收建议：
 
