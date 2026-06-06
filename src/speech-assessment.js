@@ -30,6 +30,10 @@ export function createProfessionalEvidence(result) {
     confidence: clamp(result.confidence ?? result.overall),
     signalQuality: clamp(result.signalQuality ?? 100),
     voiceActivity: clamp(result.completeness ?? 100),
+    accuracy: clamp(result.accuracy ?? result.overall),
+    fluency: clamp(result.fluency ?? result.overall),
+    completeness: clamp(result.completeness ?? result.overall),
+    prosody: Number.isFinite(result.prosody) ? clamp(result.prosody) : null,
     phonemes: result.phonemes || [],
     words: result.words || [],
     disclaimer: "专业音素级发音评测结果。"
@@ -42,10 +46,12 @@ export function createSpeechAssessmentClient(config = {}) {
     async assess(audioBlob, transcript, browserEvidence) {
       if (!config.endpoint || !(audioBlob instanceof Blob)) return createBrowserSpeechEvidence(browserEvidence);
       try {
-        const form = new FormData();
-        form.append("audio", audioBlob, "utterance.webm");
-        form.append("transcript", transcript);
-        const response = await fetch(config.endpoint, { method: "POST", body: form });
+        const endpoint = `${config.endpoint}?text=${encodeURIComponent(transcript)}`;
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": audioBlob.type || "audio/wav" },
+          body: audioBlob
+        });
         if (!response.ok) throw new Error(`Pronunciation service failed: ${response.status}`);
         return createProfessionalEvidence(await response.json());
       } catch {

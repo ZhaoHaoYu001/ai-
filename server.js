@@ -3,6 +3,7 @@ import { readFile } from "node:fs";
 import { extname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCoachService } from "./ai-service.js";
+import { createAzurePronunciationService } from "./pronunciation-service.js";
 
 const types = {
   ".css": "text/css; charset=utf-8",
@@ -49,6 +50,20 @@ function readJson(request, limit = 64 * 1024) {
   });
 }
 
+function readBody(request, limit = 2 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    request.on("data", chunk => {
+      size += chunk.length;
+      if (size > limit) reject(requestError(413, "Audio is too large"));
+      else chunks.push(chunk);
+    });
+    request.on("end", () => resolve(Buffer.concat(chunks)));
+    request.on("error", reject);
+  });
+}
+
 function validateCoachPayload(payload) {
   if (!payload || typeof payload !== "object") return false;
   if (typeof payload.answer !== "string" || !payload.answer.trim() || payload.answer.length > 2000) return false;
@@ -61,11 +76,14 @@ function validateCoachPayload(payload) {
   );
 }
 
-export function createAppServer(root = process.cwd(), { coachService = createCoachService() } = {}) {
+export function createAppServer(root = process.cwd(), {
+  coachService = createCoachService(),
+  pronunciationService = createAzurePronunciationService()
+} = {}) {
   const rootPath = resolve(root);
   return createServer(async (request, response) => {
     if (request.url === "/health") {
-      json(response, 200, { status: "ok", app: "FluentLoop", ai: coachService.available });
+      json(response, 200, { status: "ok", app: "FluentLoop", ai: coachService.available, pronunciation: pronunciationService.available });
       return;
     }
 
@@ -81,6 +99,19 @@ export function createAppServer(root = process.cwd(), { coachService = createCoa
         const status = error.status || (coachService.available ? 502 : 503);
         const message = error.status ? error.message : "Coach service is temporarily unavailable";
         json(response, status, { error: message });
+      }
+      return;
+    }
+
+    if (request.url?.startsWith("/api/pronunciation?") && request.method === "POST") {
+      try {
+        const text = new URL(request.url, "http://localhost").searchParams.get("text")?.trim();
+        if (!text || text.length > 2000) throw requestError(400, "Reference text is required");
+        if (!request.headers["content-type"]?.startsWith("audio/wav")) throw requestError(415, "Content-Type must be audio/wav");
+        json(response, 200, await pronunciationService.assess(await readBody(request), text));
+      } catch (error) {
+        const status = error.status || (pronunciationService.available ? 502 : 503);
+        json(response, status, { error: error.status ? error.message : "Pronunciation service is temporarily unavailable" });
       }
       return;
     }
@@ -115,7 +146,8 @@ export function startServer({
   root = process.cwd()
 } = {}) {
   const coachService = createCoachService();
-  const server = createAppServer(root, { coachService });
+  const pronunciationService = createAzurePronunciationService();
+  const server = createAppServer(root, { coachService, pronunciationService });
 
   server.on("error", error => {
     if (error.code === "EADDRINUSE") {
@@ -130,6 +162,7 @@ export function startServer({
     console.log(`FluentLoop is running at http://${host}:${port}`);
     console.log(`Health check: http://${host}:${port}/health`);
     console.log(`AI Coach: ${coachService.available ? "OpenAI enabled" : "offline fallback (set OPENAI_API_KEY to enable)"}`);
+    console.log(`Pronunciation: ${pronunciationService.available ? "Azure Speech enabled" : "browser proxy (set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable)"}`);
     console.log("Keep this window open while using the app. Press Ctrl+C to stop.");
   });
 

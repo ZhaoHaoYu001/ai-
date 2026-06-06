@@ -13,6 +13,7 @@
 - `src/coach.js`：纯函数形式的分析与对话策略，可独立测试，也可替换为服务端 API。
 - `src/ai-coach.js`：浏览器端 AI Coach 客户端，负责请求服务端并在失败时明确降级。
 - `ai-service.js`：服务端模型适配器，使用结构化输出生成角色回复和语境化纠错。
+- `pronunciation-service.js`：服务端 Azure Speech 适配器，返回单词、音素、韵律与综合发音诊断。
 - `server.js`：静态服务与受保护的 `/api/coach` 接口，避免向浏览器暴露 API Key。
 - `src/app.js`：只负责状态、页面渲染、语音能力和用户交互。
 - `src/styles.css`：统一视觉语言与响应式布局。

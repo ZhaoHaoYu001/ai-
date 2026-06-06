@@ -62,6 +62,33 @@ export function recognitionTranscript(results) {
   };
 }
 
+export function encodePcmWav(chunks, inputSampleRate, outputSampleRate = 16000) {
+  const input = new Float32Array(chunks.reduce((size, chunk) => size + chunk.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) {
+    input.set(chunk, offset);
+    offset += chunk.length;
+  }
+  const ratio = inputSampleRate / outputSampleRate;
+  const output = new Float32Array(Math.max(1, Math.floor(input.length / ratio)));
+  for (let index = 0; index < output.length; index += 1) {
+    const start = Math.floor(index * ratio);
+    const end = Math.max(start + 1, Math.floor((index + 1) * ratio));
+    let sum = 0;
+    for (let source = start; source < end && source < input.length; source += 1) sum += input[source];
+    output[index] = sum / Math.max(1, Math.min(end, input.length) - start);
+  }
+  const buffer = new ArrayBuffer(44 + output.length * 2);
+  const view = new DataView(buffer);
+  const write = (position, value) => [...value].forEach((character, index) => view.setUint8(position + index, character.charCodeAt(0)));
+  write(0, "RIFF"); view.setUint32(4, 36 + output.length * 2, true); write(8, "WAVE");
+  write(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, outputSampleRate, true); view.setUint32(28, outputSampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  write(36, "data"); view.setUint32(40, output.length * 2, true);
+  output.forEach((sample, index) => view.setInt16(44 + index * 2, Math.max(-1, Math.min(1, sample)) * 0x7fff, true));
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
 export async function createAudioCapture() {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
@@ -69,7 +96,17 @@ export async function createAudioCapture() {
   const context = new AudioContext();
   const analyser = context.createAnalyser();
   analyser.fftSize = 512;
-  context.createMediaStreamSource(stream).connect(analyser);
+  const source = context.createMediaStreamSource(stream);
+  source.connect(analyser);
+  const processor = context.createScriptProcessor(4096, 1, 1);
+  const silentOutput = context.createGain();
+  silentOutput.gain.value = 0;
+  source.connect(processor);
+  processor.connect(silentOutput);
+  silentOutput.connect(context.destination);
+  const pcmChunks = [];
+  let utterancePcmStart = 0;
+  processor.onaudioprocess = event => pcmChunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
   const samples = new Uint8Array(analyser.fftSize);
   const levels = [];
   let active = true;
@@ -100,7 +137,8 @@ export async function createAudioCapture() {
       };
     },
     utteranceBlob() {
-      const blob = new Blob(chunks.slice(utteranceStart), { type: recorder.mimeType || "audio/webm" });
+      const blob = encodePcmWav(pcmChunks.slice(utterancePcmStart), context.sampleRate);
+      utterancePcmStart = pcmChunks.length;
       utteranceStart = chunks.length;
       return blob;
     },
