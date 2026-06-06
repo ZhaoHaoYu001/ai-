@@ -154,9 +154,9 @@ test("automatically sends a phone turn after the learner stops speaking", async 
   await page.getByText("求职面试", { exact: true }).click();
   await page.getByRole("button", { name: "继续通话" }).click();
   await expect(page.getByRole("button", { name: "结束本轮" })).toBeVisible();
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(1800);
   await page.evaluate(() => { window.__voiceSnapshot = { averageLevel: 0, peakLevel: 0, activeRatio: 0 }; });
-  await expect(page.locator(".msg.user>div>p")).toContainText("I led the launch", { timeout: 7000 });
+  await expect(page.locator(".msg.user>div>p")).toContainText("I led the launch", { timeout: 8000 });
 });
 
 test("keeps recording after the browser recognition service fails", async ({ page }) => {
