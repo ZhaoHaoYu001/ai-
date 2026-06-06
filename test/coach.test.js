@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyze, reply, summarize } from "../src/coach.js";
+import { analyze, applyAiFeedback, reply, summarize } from "../src/coach.js";
 import { scenarios } from "../src/data.js";
 
 test("detects grammar and expression issues", () => {
@@ -29,6 +29,20 @@ test("coach follows up based on the selected scenario", () => {
   const answer = reply(scenarios[0], 0, "I enjoy the role because I like solving customer problems.");
   assert.match(answer, /Good reasoning/);
   assert.match(answer, /achievement/i);
+});
+
+test("merges contextual AI feedback with measurable local speech metrics", () => {
+  const local = analyze("I led a launch last year.", 6, { clarity: 78 });
+  const result = applyAiFeedback(local, {
+    encouragement: "成果表达清楚。",
+    grammarScore: 95,
+    vocabularyScore: 89,
+    corrections: [{ original: "led a launch", improved: "led a successful launch", reason: "表达更具体。" }]
+  });
+  assert.equal(result.scores.pronunciation, 78);
+  assert.equal(result.scores.grammar, 95);
+  assert.equal(result.corrections.length, 1);
+  assert.equal(result.assessmentMode, "ai");
 });
 
 test("session summary aggregates measurable learning metrics", () => {

@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createCoachService } from "./ai-service.js";
 
 const types = {
   ".css": "text/css; charset=utf-8",
@@ -11,11 +12,51 @@ const types = {
   ".svg": "image/svg+xml"
 };
 
-export function createAppServer(root = process.cwd()) {
-  return createServer((request, response) => {
+function json(response, status, body) {
+  response.writeHead(status, { "Content-Type": types[".json"] });
+  response.end(JSON.stringify(body));
+}
+
+function readJson(request, limit = 64 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    request.on("data", chunk => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(new Error("Request body is too large"));
+        request.destroy();
+      } else chunks.push(chunk);
+    });
+    request.on("end", () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch {
+        reject(new Error("Request body must be valid JSON"));
+      }
+    });
+    request.on("error", reject);
+  });
+}
+
+export function createAppServer(root = process.cwd(), { coachService = createCoachService() } = {}) {
+  return createServer(async (request, response) => {
     if (request.url === "/health") {
-      response.setHeader("Content-Type", types[".json"]);
-      response.end(JSON.stringify({ status: "ok", app: "FluentLoop" }));
+      json(response, 200, { status: "ok", app: "FluentLoop", ai: coachService.available });
+      return;
+    }
+
+    if (request.url === "/api/coach" && request.method === "POST") {
+      try {
+        const payload = await readJson(request);
+        if (!payload?.scenario?.title || !payload?.answer || !Array.isArray(payload.messages)) {
+          json(response, 400, { error: "scenario, messages, and answer are required" });
+          return;
+        }
+        json(response, 200, await coachService.respond(payload));
+      } catch (error) {
+        json(response, coachService.available ? 502 : 503, { error: error.message });
+      }
       return;
     }
 
@@ -46,7 +87,8 @@ export function startServer({
   port = Number(process.env.PORT) || 4173,
   root = process.cwd()
 } = {}) {
-  const server = createAppServer(root);
+  const coachService = createCoachService();
+  const server = createAppServer(root, { coachService });
 
   server.on("error", error => {
     if (error.code === "EADDRINUSE") {
@@ -60,6 +102,7 @@ export function startServer({
   server.listen(port, host, () => {
     console.log(`FluentLoop is running at http://${host}:${port}`);
     console.log(`Health check: http://${host}:${port}/health`);
+    console.log(`AI Coach: ${coachService.available ? "OpenAI enabled" : "offline fallback (set OPENAI_API_KEY to enable)"}`);
     console.log("Keep this window open while using the app. Press Ctrl+C to stop.");
   });
 
