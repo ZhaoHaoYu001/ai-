@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encodePcmWav, recognitionTranscript, translateCoachText } from "../src/voice.js";
+import { appendTurnTranscript, encodePcmWav, recognitionTranscript, translateCoachText } from "../src/voice.js";
 
 test("separates final and interim live speech transcripts", () => {
   const result = recognitionTranscript([
@@ -9,6 +9,14 @@ test("separates final and interim live speech transcripts", () => {
   ]);
   assert.equal(result.finalText, "I finished the research");
   assert.equal(result.interimText, "and I am preparing");
+});
+
+test("keeps finalized speech segments in one explicit learner turn", () => {
+  assert.equal(
+    appendTurnTranscript("I led the launch", "and increased adoption"),
+    "I led the launch and increased adoption"
+  );
+  assert.equal(appendTurnTranscript("", "  first segment  "), "first segment");
 });
 
 test("translates scenario opening into Chinese", () => {
