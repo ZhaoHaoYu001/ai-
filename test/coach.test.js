@@ -101,11 +101,26 @@ test("builds personalized session insights from scores, corrections, and history
   const insights = buildSessionInsights(
     [{ role: "user", text: "answer", analysis }],
     scenarios[0],
-    [{ overall: analysis.scores.overall - 5 }]
+    [{
+      overall: analysis.scores.overall - 5,
+      fluency: analysis.scores.fluency - 5,
+      grammar: analysis.scores.grammar - 5,
+      vocabulary: analysis.scores.vocabulary - 5
+    }]
   );
   assert.match(insights.strength, /分/);
   assert.match(insights.focus, /下一步重点/);
   assert.match(insights.correction, /优先复练/);
   assert.match(insights.nextTask, /求职面试/);
   assert.match(insights.trend, /提高 5 分/);
+  assert.equal(insights.progress.find(item => item.key === "overall"), undefined);
+  assert.ok(insights.progress.some(item => item.delta === 5));
+  assert.match(insights.measurableGoal, /提升到至少/);
+});
+
+test("session insights establish measurable baselines without history", () => {
+  const analysis = analyze("I enjoy solving customer problems because the work creates measurable impact.", 8);
+  const insights = buildSessionInsights([{ role: "user", text: "answer", analysis }], scenarios[0], []);
+  assert.ok(insights.progress.every(item => item.baseline === null && item.delta === null));
+  assert.match(insights.measurableGoal, /至少 2 轮|提升到至少/);
 });

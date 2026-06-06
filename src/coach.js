@@ -116,12 +116,23 @@ export function buildSessionInsights(messages, scenario, history = []) {
     Math.round(previousScores.reduce((sum, score) => sum + score, 0) / previousScores.length) : null;
   const trend = Number.isFinite(summary.overall) && Number.isFinite(previousAverage) ?
     summary.overall - previousAverage : null;
+  const progress = dimensions.map(item => {
+    const previous = history.map(record => Number(record[item.key])).filter(Number.isFinite).slice(0, 5);
+    const baseline = previous.length ? Math.round(previous.reduce((sum, score) => sum + score, 0) / previous.length) : null;
+    return { ...item, baseline, delta: Number.isFinite(baseline) ? item.score - baseline : null };
+  });
+  const focus = dimensions.at(-1);
+  const targetScore = focus ? Math.min(100, focus.score + 5) : null;
 
   return {
     strength: dimensions[0] ? `${dimensions[0].label}是本次优势（${dimensions[0].score} 分）。` : "完成更多回答后可识别优势能力。",
     focus: dimensions.at(-1) ? `${dimensions.at(-1).label}是下一步重点（${dimensions.at(-1).score} 分）。` : "完成语音回答后可生成重点建议。",
     correction: frequentCorrection ? `优先复练：${frequentCorrection[0]}${frequentCorrection[1] > 1 ? `（出现 ${frequentCorrection[1]} 次）` : ""}。` : "本次没有发现需要优先复练的表达错误。",
     nextTask: `下一次继续练习“${scenario.title}”，目标是：${scenario.goal}。`,
+    progress,
+    measurableGoal: focus ?
+      `下一次将${focus.label}从 ${focus.score} 分提升到至少 ${targetScore} 分，并完成不少于 ${Math.max(2, summary.turns)} 轮回答。` :
+      "下一次完成至少 2 轮语音回答，建立可比较的能力基线。",
     trend: trend === null ? "完成更多练习后将显示历史趋势。" :
       trend > 0 ? `综合分比最近练习平均提高 ${trend} 分。` :
       trend < 0 ? `综合分比最近练习平均低 ${Math.abs(trend)} 分，建议针对重点能力复练。` :
