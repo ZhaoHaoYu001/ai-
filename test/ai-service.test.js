@@ -41,6 +41,8 @@ test("AI coach sends context and returns structured feedback", async () => {
   assert.equal(requestBody.model, "test-model");
   assert.equal(requestBody.max_output_tokens, 800);
   assert.equal(requestBody.text.format.type, "json_schema");
+  assert.ok(requestBody.text.format.schema.required.includes("support"));
+  assert.match(requestBody.input, /support must respond directly/i);
   assert.match(requestBody.input, /product launch/);
   assert.match(requestBody.input, /Tell me about yourself/);
 });
@@ -172,6 +174,34 @@ test("Anthropic-compatible coach consumes Messages API stream deltas", async () 
   const result = await service.respondStream(payload, delta => deltas.push(delta));
   assert.equal(result.feedback.grammarScore, 95);
   assert.deepEqual(deltas, parts);
+});
+
+test("Anthropic-compatible coach accepts CRLF-delimited SSE streams", async () => {
+  const resultText = JSON.stringify({
+    coachReply: "What measurable impact did it have?",
+    translation: "它产生了哪些可量化影响？",
+    support: {
+      starters: ["The result was...", "We measured...", "This led to..."],
+      keywords: ["result", "impact", "increase", "adoption"],
+      example: "The result was a 20% increase in adoption."
+    },
+    feedback: { encouragement: "成果清晰。", grammarScore: 94, vocabularyScore: 91, corrections: [] }
+  });
+  const service = createCoachService({
+    provider: "anthropic",
+    apiKey: "test-key",
+    request: async () => ({
+      ok: true,
+      body: {
+        async *[Symbol.asyncIterator]() {
+          yield new TextEncoder().encode(`event: content_block_delta\r\ndata:${JSON.stringify({ type: "content_block_delta", delta: { type: "text_delta", text: resultText } })}\r\n\r\n`);
+        }
+      }
+    })
+  });
+
+  const result = await service.respondStream(payload);
+  assert.equal(result.support.keywords[1], "impact");
 });
 
 test("Anthropic-compatible coach tolerates trailing commas in structured model output", async () => {

@@ -21,6 +21,11 @@ test("browser AI client applies contextual model feedback", async () => {
           model: "mimo-v2.5",
           coachReply: "What measurable result did the launch achieve?",
           translation: "这次发布取得了什么可量化成果？",
+          support: {
+            starters: ["The result was...", "We measured success by...", "This led to..."],
+            keywords: ["result", "adoption", "increase", "impact"],
+            example: "The result was a 20% increase in adoption."
+          },
           feedback: {
             encouragement: "成果表达很清楚。",
             grammarScore: 96,
@@ -38,6 +43,8 @@ test("browser AI client applies contextual model feedback", async () => {
   assert.equal(result.model, "mimo-v2.5");
   assert.equal(result.analysis.assessmentMode, "ai");
   assert.equal(result.analysis.scores.grammar, 96);
+  assert.equal(result.coach.support.starters[0], "The result was...");
+  assert.match(result.coach.support.example, /20%/);
   assert.match(result.coach.text, /measurable result/);
 });
 

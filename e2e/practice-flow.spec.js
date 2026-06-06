@@ -92,6 +92,7 @@ test("completes the full text fallback practice flow", async ({ page }) => {
   await page.getByRole("button", { name: "↑" }).click();
   await expect(page.locator(".msg.user>div>p")).toContainText("I have three years experience");
   await expect(page.getByText("OFFLINE FALLBACK", { exact: true })).toBeVisible();
+  await expect(page.locator(".answer-support")).toContainText("The result was...");
   await expect(page.getByRole("button", { name: "↑" })).toBeEnabled();
   await page.getByRole("button", { name: "结束练习并查看报告" }).click();
   await expect(page.locator("main.report")).toBeVisible();
@@ -119,7 +120,7 @@ test("keeps speech across recognition reconnects and sends one explicit turn", a
   await expect(page.getByText("麦克风录音已就绪，可生成发音评测", { exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__speechInstances.length)).toBe(1);
   const support = page.locator(".answer-support");
-  await expect(support.getByText("回答支架 · 通话中也可参考", { exact: true })).toBeVisible();
+  await expect(support.getByText("上下文回答建议 · 通话中也可参考", { exact: true })).toBeVisible();
   await expect(support).toContainText("Could you start by telling me a little about yourself?");
   await expect(support).toContainText("I have experience in...");
   await expect(support).toContainText("I have three years of experience in product design");
@@ -179,6 +180,6 @@ test("keeps the core practice workflow usable on a mobile viewport", async ({ pa
   await page.getByText("工作会议", { exact: true }).click();
   await expect(page.locator(".practice aside")).toBeHidden();
   await expect(page.locator(".conversation")).toBeVisible();
-  await expect(page.getByText("回答支架 · 通话中也可参考", { exact: true })).toBeVisible();
+  await expect(page.getByText("上下文回答建议 · 通话中也可参考", { exact: true })).toBeVisible();
   await expect(page.getByPlaceholder("语音不可用时，也可以输入英文回答…")).toBeVisible();
 });

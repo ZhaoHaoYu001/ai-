@@ -1,4 +1,5 @@
 import { analyze, applyAiFeedback, reply } from "./coach.js";
+import { contextualAnswerSupport, normalizeAnswerSupport } from "./answer-support.js";
 
 export function createAiCoachClient({
   endpoint = "/api/coach/stream",
@@ -63,18 +64,20 @@ export function createAiCoachClient({
           latency: { firstByteMs, aiMs: Math.round(performance.now() - startedAt), transport: response.body?.getReader ? "stream" : "json" },
           coach: {
             text: result.coachReply,
-            translation: result.translation
+            translation: result.translation,
+            support: normalizeAnswerSupport(result.support, contextualAnswerSupport(scenario, result.coachReply))
           }
         };
       } catch {
         const turn = messages.filter(message => message.role === "user").length;
+        const coachText = reply(scenario, turn, text);
         return {
           mode: "offline",
           provider: null,
           model: null,
           analysis: localAnalysis,
           latency: { firstByteMs, aiMs: Math.round(performance.now() - startedAt), transport: "offline" },
-          coach: { text: reply(scenario, turn, text) }
+          coach: { text: coachText, support: contextualAnswerSupport(scenario, coachText) }
         };
       } finally {
         clearTimeout(timeout);

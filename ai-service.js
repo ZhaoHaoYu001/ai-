@@ -1,10 +1,20 @@
 const responseSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["coachReply", "translation", "feedback"],
+  required: ["coachReply", "translation", "support", "feedback"],
   properties: {
     coachReply: { type: "string" },
     translation: { type: "string" },
+    support: {
+      type: "object",
+      additionalProperties: false,
+      required: ["starters", "keywords", "example"],
+      properties: {
+        starters: { type: "array", minItems: 3, maxItems: 3, items: { type: "string" } },
+        keywords: { type: "array", minItems: 4, maxItems: 4, items: { type: "string" } },
+        example: { type: "string" }
+      }
+    },
     feedback: {
       type: "object",
       additionalProperties: false,
@@ -50,6 +60,8 @@ Learner's latest answer: ${answer}
 Continue the role-play naturally. Ask one concise, context-aware follow-up question.
 Do not repeat a question already asked. Keep coachReply under 45 words.
 Give a natural Chinese translation of coachReply.
+Create support for answering coachReply: exactly 3 concise English sentence starters, exactly 4 useful keywords or phrases, and one natural English example answer under 35 words.
+The support must respond directly to coachReply and reflect the latest conversation context. Do not repeat generic scenario-level support.
 Assess grammar and vocabulary in context, not with keyword matching.
 Only include corrections that materially improve the answer.
 Correction reasons must be concise Chinese explanations.
@@ -164,10 +176,12 @@ export function createCoachService({
       let output = "";
       for await (const chunk of response.body) {
         pending += decoder.decode(chunk, { stream: true });
+        pending = pending.replace(/\r\n/g, "\n");
         const events = pending.split("\n\n");
         pending = events.pop() || "";
         for (const event of events) {
-          const data = event.split("\n").find(line => line.startsWith("data: "))?.slice(6);
+          const dataLine = event.split("\n").find(line => line.startsWith("data:"));
+          const data = dataLine?.replace(/^data:\s?/, "");
           if (!data || data === "[DONE]") continue;
           const parsed = JSON.parse(data);
           const delta = provider === "anthropic" && parsed.type === "content_block_delta" ? parsed.delta?.text :
