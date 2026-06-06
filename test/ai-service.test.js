@@ -39,6 +39,7 @@ test("AI coach sends context and returns structured feedback", async () => {
   const result = await service.respond(payload);
   assert.equal(result.feedback.grammarScore, 94);
   assert.equal(requestBody.model, "test-model");
+  assert.equal(requestBody.max_output_tokens, 800);
   assert.equal(requestBody.text.format.type, "json_schema");
   assert.match(requestBody.input, /product launch/);
   assert.match(requestBody.input, /Tell me about yourself/);
@@ -110,8 +111,40 @@ test("Anthropic-compatible coach sends Messages API requests and parses structur
   assert.equal(requestHeaders.Authorization, "Bearer test-anthropic-key");
   assert.equal(requestHeaders["x-api-key"], "test-anthropic-key");
   assert.equal(requestBody.model, "mimo-v2.5");
+  assert.equal(requestBody.max_tokens, 800);
+  assert.equal(requestBody.thinking, undefined);
   assert.match(requestBody.messages[0].content, /product launch/);
   assert.equal(result.feedback.grammarScore, 93);
+});
+
+test("GLM coach disables deep thinking for low-latency speaking practice", async () => {
+  let requestBody;
+  const service = createCoachService({
+    provider: "anthropic",
+    apiKey: "test-key",
+    model: "glm-5.1",
+    request: async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return {
+        ok: true,
+        async json() {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                coachReply: "What happened next?",
+                translation: "接下来发生了什么？",
+                feedback: { encouragement: "表达清楚。", grammarScore: 90, vocabularyScore: 88, corrections: [] }
+              })
+            }]
+          };
+        }
+      };
+    }
+  });
+
+  await service.respond(payload);
+  assert.deepEqual(requestBody.thinking, { type: "disabled" });
 });
 
 test("Anthropic-compatible coach consumes Messages API stream deltas", async () => {

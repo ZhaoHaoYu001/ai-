@@ -76,11 +76,12 @@ function parseStructuredText(text) {
   }
 }
 
-function responseBody(model, payload, stream = false) {
+function responseBody(model, payload, stream = false, maxTokens = 800) {
   return {
     model,
     input: buildPrompt(payload),
     stream,
+    max_output_tokens: maxTokens,
     text: {
       format: {
         type: "json_schema",
@@ -96,14 +97,18 @@ function anthropicEndpoint(baseUrl) {
   return `${String(baseUrl).replace(/\/+$/, "")}/v1/messages`;
 }
 
-function anthropicBody(model, payload, stream = false) {
-  return {
+function anthropicBody(model, payload, stream = false, maxTokens = 800) {
+  const body = {
     model,
-    max_tokens: 2400,
+    max_tokens: maxTokens,
     stream,
     system: `Return only compact valid JSON matching this JSON Schema. Do not include markdown, comments, or analysis:\n${JSON.stringify(responseSchema)}`,
     messages: [{ role: "user", content: buildPrompt(payload) }]
   };
+  if (/^glm-/i.test(model)) {
+    body.thinking = { type: process.env.AI_THINKING || "disabled" };
+  }
+  return body;
 }
 
 export function createCoachService({
@@ -111,6 +116,7 @@ export function createCoachService({
   apiKey = provider === "anthropic" ? (process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY) : process.env.OPENAI_API_KEY,
   baseUrl = provider === "anthropic" ? (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com") : "https://api.openai.com",
   model = provider === "anthropic" ? (process.env.ANTHROPIC_MODEL || "mimo-v2.5") : (process.env.OPENAI_MODEL || "gpt-5.4-mini"),
+  maxTokens = Number(process.env.AI_MAX_TOKENS) || 800,
   request = globalThis.fetch
 } = {}) {
   const headers = provider === "anthropic" ? {
@@ -132,7 +138,7 @@ export function createCoachService({
       const response = await request(provider === "anthropic" ? anthropicEndpoint(baseUrl) : `${baseUrl}/v1/responses`, {
         method: "POST",
         headers,
-        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload) : responseBody(model, payload))
+        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload, false, maxTokens) : responseBody(model, payload, false, maxTokens))
       });
 
       if (!response.ok) {
@@ -149,7 +155,7 @@ export function createCoachService({
       const response = await request(provider === "anthropic" ? anthropicEndpoint(baseUrl) : `${baseUrl}/v1/responses`, {
         method: "POST",
         headers,
-        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload, true) : responseBody(model, payload, true))
+        body: JSON.stringify(provider === "anthropic" ? anthropicBody(model, payload, true, maxTokens) : responseBody(model, payload, true, maxTokens))
       });
       if (!response.ok || !response.body) throw new Error(`${provider} streaming request failed (${response.status})`);
 

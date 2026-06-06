@@ -192,6 +192,9 @@ export function startServer({
   const coachService = createCoachService();
   const pronunciationService = createAzurePronunciationService();
   const transcriptionServicePromise = createTranscriptionService();
+  const transcriptionWarmupPromise = transcriptionServicePromise
+    .then(service => service.warmup?.())
+    .catch(error => console.warn(`Transcription warmup skipped: ${error.message}`));
   const server = createAppServer(root, { coachService, pronunciationService, transcriptionService: transcriptionServicePromise });
 
   server.on("error", error => {
@@ -210,6 +213,10 @@ export function startServer({
     console.log(`AI Coach: ${coachService.available ? `${coachService.provider} / ${coachService.model}` : "offline fallback (set ANTHROPIC_AUTH_TOKEN or OPENAI_API_KEY to enable)"}`);
     console.log(`Pronunciation: ${pronunciationService.available ? "Azure Speech enabled" : "browser proxy (set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable)"}`);
     console.log(`Transcription fallback: ${transcriptionService.provider}${transcriptionService.model ? ` / ${transcriptionService.model}` : ""}`);
+    if (transcriptionService.warmup) {
+      console.log("Local Whisper is warming up in the background for a faster first response.");
+      void transcriptionWarmupPromise;
+    }
     console.log("Keep this window open while using the app. Press Ctrl+C to stop.");
   });
 

@@ -1,7 +1,7 @@
 export function createVoiceActivityGate({
   speechThreshold = .035,
   silenceThreshold = .018,
-  silenceMs = 1400,
+  silenceMs = 1000,
   maxTurnMs = 45_000
 } = {}) {
   let startedAt = null;

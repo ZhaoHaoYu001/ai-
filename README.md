@@ -26,6 +26,9 @@ npm.cmd start
 ```
 
 也可使用常见的 `ANTHROPIC_API_KEY` 环境变量替代 `ANTHROPIC_AUTH_TOKEN`。
+为保证口语通话响应速度，GLM 模型默认关闭深度思考，并将单轮 AI 输出限制为
+800 tokens。可通过 `AI_THINKING=enabled` 重新开启思考，或通过
+`AI_MAX_TOKENS` 调整输出上限；开启深度思考会显著增加通话等待时间。
 
 也可使用 OpenAI Responses API：
 
@@ -69,6 +72,9 @@ npm.cmd start
 `"transcription":true` 和 `"transcriptionProvider":"local-whisper"`。
 后续重新启动项目会直接复用本机缓存；如需更换下载镜像，可在启动前设置
 `$env:HF_ENDPOINT="https://your-huggingface-mirror/"`。
+
+服务启动后会在后台预热本地 Whisper，建议看到启动日志后再打开练习页面。
+短录音使用无分块快速推理，超过 20 秒的录音才会自动分块处理。
 
 详细接口、隐私与降级策略见 `docs/AI_COACH.md` 和 `docs/AZURE_PRONUNCIATION.md`。
 

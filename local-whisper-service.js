@@ -62,12 +62,17 @@ export function createLocalWhisperService({
     provider: "local-whisper",
     model,
     available: true,
+    warmup() {
+      return recognizer();
+    },
     async transcribe(audio) {
       const samples = decodePcmWav(audio);
-      const result = await (await recognizer())(samples, {
+      const durationSeconds = samples.length / 16000;
+      const options = durationSeconds > 20 ? {
         chunk_length_s: 20,
         stride_length_s: 3
-      });
+      } : {};
+      const result = await (await recognizer())(samples, options);
       const text = result?.text?.trim();
       if (!text) throw new Error("Local Whisper did not recognize speech");
       return { provider: "local-whisper", model, text, confidence: null };

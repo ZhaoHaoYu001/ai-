@@ -28,14 +28,16 @@ test("decodes the browser 16 kHz PCM WAV format for local Whisper", () => {
 test("local Whisper service loads once and returns an English transcript", async () => {
   let loads = 0;
   let received;
+  let receivedOptions;
   const service = createLocalWhisperService({
     model: "test-whisper",
     loadPipeline: async () => {
       loads += 1;
       return async (_task, model) => {
         assert.equal(model, "test-whisper");
-        return async samples => {
+        return async (samples, options) => {
           received = samples;
+          receivedOptions = options;
           return { text: " I led the launch. " };
         };
       };
@@ -43,8 +45,23 @@ test("local Whisper service loads once and returns an English transcript", async
   });
 
   const audio = pcm16Wav(new Array(160).fill(1000));
+  await service.warmup();
   assert.equal((await service.transcribe(audio)).text, "I led the launch.");
   assert.equal((await service.transcribe(audio)).provider, "local-whisper");
   assert.equal(received.length, 160);
+  assert.deepEqual(receivedOptions, {});
   assert.equal(loads, 1);
+});
+
+test("local Whisper chunks only long recordings", async () => {
+  let receivedOptions;
+  const service = createLocalWhisperService({
+    loadPipeline: async () => async () => async (_samples, options) => {
+      receivedOptions = options;
+      return { text: "Long answer." };
+    }
+  });
+
+  await service.transcribe(pcm16Wav(new Array(16000 * 21).fill(1000)));
+  assert.deepEqual(receivedOptions, { chunk_length_s: 20, stride_length_s: 3 });
 });
