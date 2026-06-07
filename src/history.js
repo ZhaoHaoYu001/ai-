@@ -3,6 +3,10 @@ const MAX_SESSIONS = 180;
 const MAX_DETAILED_SESSIONS = 30;
 const MAX_REVIEW_TURNS = 12;
 
+export function hasPracticeEvidence(summary) {
+  return Number(summary?.turns) > 0 && Number(summary?.words) > 0;
+}
+
 export function loadHistory(storage = globalThis.localStorage) {
   try {
     const history = JSON.parse(storage?.getItem(HISTORY_KEY) || "[]");

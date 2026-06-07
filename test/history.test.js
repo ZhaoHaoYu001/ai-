@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildSessionRecord, loadHistory, saveSessionRecord } from "../src/history.js";
+import { buildSessionRecord, hasPracticeEvidence, loadHistory, saveSessionRecord } from "../src/history.js";
 import { analyze, buildSessionInsights, summarize } from "../src/coach.js";
 import { scenarios } from "../src/data.js";
 
@@ -14,6 +14,11 @@ function memoryStorage(initial = null) {
 
 test("loads an empty history when local data is corrupted", () => {
   assert.deepEqual(loadHistory(memoryStorage("{not-json")), []);
+});
+
+test("requires at least one learner answer before recording practice", () => {
+  assert.equal(hasPracticeEvidence({ turns: 0, words: 0 }), false);
+  assert.equal(hasPracticeEvidence({ turns: 1, words: 1 }), true);
 });
 
 test("stores compact reviewable turns with corrections and pronunciation practice", () => {
