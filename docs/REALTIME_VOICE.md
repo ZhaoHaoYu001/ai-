@@ -27,6 +27,11 @@ the safer 2.4-second window.
 Grammar, expression, and pronunciation feedback appears only after the learner
 finishes a turn, so coaching remains precise without interrupting speech.
 
+If the learner hangs up while a voice turn, transcription, pronunciation
+assessment, or Coach analysis is still active, FluentLoop finishes and saves
+that last turn before generating the report. It does not play another Coach
+reply while the session is closing.
+
 ## Interaction model
 
 FluentLoop uses an explicit, half-duplex learner-turn pattern instead of an
