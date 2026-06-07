@@ -144,6 +144,49 @@ test("keeps speech across recognition reconnects and sends one explicit turn", a
   await expect(page.getByText("AI 场景语音通话", { exact: true })).toBeVisible();
 });
 
+test("preserves an active voice turn when the learner hangs up", async ({ page }) => {
+  await mockBrowserVoice(page, "pending");
+  await mockTurnRecognition(page);
+  await page.goto("/");
+  await page.getByText("求职面试", { exact: true }).click();
+  await page.getByRole("button", { name: "继续通话" }).click();
+  await page.evaluate(() => window.__emitFinalSpeech("I led the final launch successfully"));
+  await page.getByRole("button", { name: "挂断并查看报告" }).click();
+  await expect(page.locator("main.report")).toBeVisible();
+  await expect(page.locator(".stats span").first()).toContainText("1");
+  const history = await page.evaluate(() => JSON.parse(localStorage.getItem("fluentloop-history")));
+  expect(history[0].reviewTurns[0].answer).toBe("I led the final launch successfully");
+});
+
+test("waits for an in-flight Coach review before generating the report", async ({ page }) => {
+  await mockBrowserVoice(page);
+  await page.route("**/api/coach/stream", async route => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await route.fulfill({
+      status: 200,
+      contentType: "application/x-ndjson",
+      body: `${JSON.stringify({
+        type: "final",
+        result: {
+          provider: "e2e",
+          model: "test",
+          coachReply: "What happened next?",
+          translation: "接下来发生了什么？",
+          feedback: { encouragement: "回答具体。", grammarScore: 92, vocabularyScore: 90, corrections: [] }
+        }
+      })}\n`
+    });
+  });
+  await page.goto("/");
+  await page.getByText("求职面试", { exact: true }).click();
+  await page.getByRole("button", { name: "填入纠错示例" }).click();
+  await page.getByRole("button", { name: "↑" }).click();
+  await expect(page.getByText("AI Coach 正在理解上下文", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "结束练习并查看报告" }).click();
+  await expect(page.locator("main.report")).toBeVisible();
+  await expect(page.locator(".stats span").first()).toContainText("1");
+});
+
 test("uses the recorded turn when browser recognition returns no text", async ({ page }) => {
   await mockServerTranscriptionFallback(page);
   await page.goto("/");
