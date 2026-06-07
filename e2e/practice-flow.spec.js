@@ -97,6 +97,12 @@ test("completes the full text fallback practice flow", async ({ page }) => {
   await page.getByRole("button", { name: "结束练习并查看报告" }).click();
   await expect(page.locator("main.report")).toBeVisible();
   await expect(page.getByText("本次练习洞察", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "选择其他场景" }).click();
+  await expect(page.getByText("历史练习与复盘", { exact: true })).toBeVisible();
+  await page.locator("[data-history]").first().click();
+  await expect(page.getByText("逐轮回顾", { exact: true })).toBeVisible();
+  await expect(page.locator(".review-turn blockquote")).toContainText("I have three years experience");
+  await expect(page.getByText("表达复练", { exact: true })).toBeVisible();
 });
 
 test("falls back cleanly when microphone permission is denied", async ({ page }) => {
