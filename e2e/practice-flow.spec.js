@@ -88,6 +88,9 @@ test("completes the full text fallback practice flow", async ({ page }) => {
   await page.goto("/");
   await page.getByText("求职面试", { exact: true }).click();
   await expect(page.getByPlaceholder("语音不可用时，也可以输入英文回答…")).toBeEnabled();
+  await expect(page.locator("[data-answer-example]")).toHaveCount(3);
+  await page.locator("[data-answer-example]").nth(1).click();
+  await expect(page.getByPlaceholder("语音不可用时，也可以输入英文回答…")).not.toHaveValue("");
   await page.getByRole("button", { name: "填入纠错示例" }).click();
   await page.getByRole("button", { name: "↑" }).click();
   await expect(page.locator(".msg.user>div>p")).toContainText("I have three years experience");
