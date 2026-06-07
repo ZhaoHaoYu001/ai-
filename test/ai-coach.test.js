@@ -49,16 +49,52 @@ test("browser AI client applies contextual model feedback", async () => {
 });
 
 test("browser AI client clearly falls back when the service is unavailable", async () => {
-  const client = createAiCoachClient({ request: async () => ({ ok: false, status: 503 }) });
+  let attempts = 0;
+  const client = createAiCoachClient({
+    retryDelayMs: 0,
+    request: async () => {
+      attempts++;
+      return { ok: false, status: 503 };
+    }
+  });
   const result = await client.respond(context);
   assert.equal(result.mode, "offline");
   assert.equal(result.provider, null);
+  assert.equal(attempts, 2);
+  assert.match(result.fallbackReason, /离线教练/);
   assert.match(result.coach.text, /achievement/i);
+});
+
+test("browser AI client recovers from one temporary service failure", async () => {
+  let attempts = 0;
+  const client = createAiCoachClient({
+    retryDelayMs: 0,
+    request: async () => {
+      attempts++;
+      if (attempts === 1) return { ok: false, status: 503 };
+      return {
+        ok: true,
+        async json() {
+          return {
+            provider: "anthropic",
+            model: "demo-model",
+            coachReply: "What happened next?",
+            translation: "接下来发生了什么？",
+            feedback: { encouragement: "表达清晰。", grammarScore: 92, vocabularyScore: 90, corrections: [] }
+          };
+        }
+      };
+    }
+  });
+  const result = await client.respond(context);
+  assert.equal(result.mode, "ai");
+  assert.equal(result.latency.attempts, 2);
 });
 
 test("browser AI client times out and falls back without blocking the session", async () => {
   const client = createAiCoachClient({
     timeoutMs: 5,
+    retryDelayMs: 0,
     request: (_url, options) => new Promise((_resolve, reject) => {
       options.signal.addEventListener("abort", () => reject(new Error("aborted")));
     })

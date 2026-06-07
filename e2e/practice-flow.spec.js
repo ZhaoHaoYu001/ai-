@@ -92,11 +92,13 @@ test("completes the full text fallback practice flow", async ({ page }) => {
   await page.getByRole("button", { name: "↑" }).click();
   await expect(page.locator(".msg.user>div>p")).toContainText("I have three years experience");
   await expect(page.getByText("OFFLINE FALLBACK", { exact: true })).toBeVisible();
+  await expect(page.getByText(/已切换到离线教练/)).toBeVisible();
   await expect(page.locator(".answer-support")).toContainText("The result was...");
   await expect(page.getByRole("button", { name: "↑" })).toBeEnabled();
   await page.getByRole("button", { name: "结束练习并查看报告" }).click();
   await expect(page.locator("main.report")).toBeVisible();
   await expect(page.getByText("本次练习洞察", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "再练一次 →" })).toHaveCSS("color", "rgb(23, 36, 30)");
   await page.getByRole("button", { name: "选择其他场景" }).click();
   await expect(page.getByText("历史练习与复盘", { exact: true })).toBeVisible();
   await page.locator("[data-history]").first().click();
