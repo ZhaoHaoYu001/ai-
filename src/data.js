@@ -8,7 +8,12 @@ export const scenarios = [
     support: {
       starters: ["I have experience in...", "One achievement I am proud of is...", "I was responsible for..."],
       keywords: ["experience", "responsible for", "result", "learned"],
-      example: "I have three years of experience in product design, and I enjoy turning complex problems into simple experiences."
+      example: "I have three years of experience in product design, and I enjoy turning complex problems into simple experiences.",
+      examples: [
+        "I have three years of experience in product design, and I enjoy turning complex problems into simple experiences.",
+        "Most recently, I led a product redesign that increased activation by 18 percent.",
+        "My strength is connecting customer research with clear, measurable product decisions."
+      ]
     },
     demo: "I have three years experience in product design. I very like turning complex problems into simple experiences."
   },
@@ -21,7 +26,12 @@ export const scenarios = [
     support: {
       starters: ["I have a reservation under...", "Could I have...?", "Would it be possible to...?"],
       keywords: ["reservation", "table", "recommend", "bill"],
-      example: "I have a reservation under Zhao. Could I have a table near the window, please?"
+      example: "I have a reservation under Zhao. Could I have a table near the window, please?",
+      examples: [
+        "I have a reservation under Zhao. Could I have a table near the window, please?",
+        "Could you recommend a popular main course that is not too spicy?",
+        "Everything was great. Could we have the bill when you have a moment?"
+      ]
     },
     demo: "Yes, I have a reservation under Zhao. Could I also have a table near the window?"
   },
@@ -34,7 +44,12 @@ export const scenarios = [
     support: {
       starters: ["I have completed...", "The main risk is...", "I need support with..."],
       keywords: ["progress", "timeline", "risk", "next step"],
-      example: "I have completed the user research. The next step is to confirm the launch timeline with the team."
+      example: "I have completed the user research. The next step is to confirm the launch timeline with the team.",
+      examples: [
+        "I have completed the user research. The next step is to confirm the launch timeline with the team.",
+        "The main risk is delayed feedback, so I suggest agreeing on owners today.",
+        "I need support from engineering to validate the estimate before Friday."
+      ]
     },
     demo: "My part is almost complete. I finished the user research, but we should discuss about the launch timeline."
   },
@@ -47,7 +62,12 @@ export const scenarios = [
     support: {
       starters: ["Excuse me, how can I get to...?", "How long does it take...?", "Should I take...?"],
       keywords: ["subway", "walking distance", "transfer", "ticket"],
-      example: "Excuse me, how can I get to the city museum? Is it faster to walk or take the subway?"
+      example: "Excuse me, how can I get to the city museum? Is it faster to walk or take the subway?",
+      examples: [
+        "Excuse me, how can I get to the city museum? Is it faster to walk or take the subway?",
+        "How long does the trip take, and do I need to transfer?",
+        "Could you show me where to buy a ticket for the subway?"
+      ]
     },
     demo: "Excuse me, how can I get to the city museum? Is walking more better than taking the subway?"
   }
