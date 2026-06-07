@@ -7,6 +7,8 @@ so it records learning activity instead of manual check-in clicks.
 ## Behavior
 
 - Multiple sessions on one local calendar day create one checked day.
+- A session is recorded only after the learner completes at least one answer;
+  opening and immediately leaving a scene does not affect streaks or trends.
 - A checked day records session count, best score, and spoken words.
 - The dashboard shows current streak, active days this month, and total words.
 - Up to 180 recent sessions are retained locally for longer-term trends.

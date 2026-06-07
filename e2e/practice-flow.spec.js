@@ -115,6 +115,16 @@ test("falls back cleanly when microphone permission is denied", async ({ page })
   await expect(page.getByPlaceholder("语音不可用时，也可以输入英文回答…")).toBeEnabled();
 });
 
+test("does not add an empty session to learning history", async ({ page }) => {
+  await mockBrowserVoice(page);
+  await page.goto("/");
+  await page.getByText("餐厅点餐", { exact: true }).click();
+  await page.getByRole("button", { name: "结束练习并查看报告" }).click();
+  await expect(page.getByText("本次尚未完成", { exact: false })).toBeVisible();
+  await expect(page.getByText(/至少完成一轮回答后/)).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("fluentloop-history"))).toBeNull();
+});
+
 test("keeps speech across recognition reconnects and sends one explicit turn", async ({ page }) => {
   await mockBrowserVoice(page, "pending");
   await mockTurnRecognition(page);
