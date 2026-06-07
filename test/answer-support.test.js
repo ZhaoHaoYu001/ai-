@@ -9,6 +9,7 @@ test("changes answer support with the current coach question", () => {
   assert.match(result.starters[0], /result/i);
   assert.ok(result.keywords.includes("impact"));
   assert.match(result.example, /20%/);
+  assert.equal(result.examples.length, 3);
 });
 
 test("normalizes AI support and falls back when it is incomplete", () => {
@@ -21,4 +22,5 @@ test("normalizes AI support and falls back when it is incomplete", () => {
   assert.deepEqual(result.starters, ["First...", "Then...", "Finally..."]);
   assert.deepEqual(result.keywords, fallback.keywords);
   assert.equal(result.example, fallback.example);
+  assert.deepEqual(result.examples, fallback.examples);
 });

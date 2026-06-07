@@ -1,14 +1,19 @@
 const cleanList = (value, fallback, limit) => {
   const items = Array.isArray(value) ? value : [];
-  const cleaned = items.map(item => String(item || "").trim()).filter(Boolean).slice(0, limit);
-  return cleaned.length ? cleaned : fallback.slice(0, limit);
+  return [...items, ...fallback]
+    .map(item => String(item || "").trim())
+    .filter((item, index, all) => item && all.indexOf(item) === index)
+    .slice(0, limit);
 };
 
 export function normalizeAnswerSupport(value, fallback) {
+  const fallbackExamples = fallback.examples || [fallback.example];
+  const examples = cleanList(value?.examples || [value?.example], fallbackExamples, 3);
   return {
     starters: cleanList(value?.starters, fallback.starters, 3),
     keywords: cleanList(value?.keywords, fallback.keywords, 4),
-    example: String(value?.example || "").trim() || fallback.example
+    example: examples[0],
+    examples
   };
 }
 
